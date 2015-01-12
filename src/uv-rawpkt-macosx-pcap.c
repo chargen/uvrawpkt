@@ -1,7 +1,7 @@
 #include "uv.h"
+#include "uv-rawpkt.h"
 
 #if defined(__APPLE__)
-#include "uv-rawpkt-macosx-pcap.h"
 
 int uv_rawpkt_iter_init(uv_loop_t* loop,
                         uv_rawpkt_iter_t* iter)

@@ -1,7 +1,9 @@
 #ifndef UV_RAWPKT_WIN32_PCAP_H
 #define UV_RAWPKT_WIN32_PCAP_H
 
-#include "uv.h"
+#include "uv-rawpkt-common.h"
+
+#if defined(_WIN32)
 
 #ifdef __cplusplus
 extern "C" {
@@ -10,6 +12,8 @@ extern "C" {
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif

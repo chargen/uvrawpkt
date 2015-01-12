@@ -1,7 +1,7 @@
 #include "uv.h"
+#include "uv-rawpkt.h"
 
 #if defined(_WIN32)
-#include "uv-rawpkt-win32-pcap.h"
 
 #  pragma comment(lib, "IPHLPAPI.lib")
 #  pragma comment(lib, "wpcap.lib" )
