@@ -27,42 +27,43 @@ int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 }
 
 int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
-                             const char* device_name,
-                             int promiscuous)
+                   const char* device_name,
+                   int promiscuous,
+                   uint16_t *ethertype )
 {
     return -1;
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
-                              uv_close_cb close_cb)
+                     uv_close_cb close_cb)
 {
 }
 
 int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
-                               uint8_t *eui48)
+                     uint8_t *eui48)
 {
     return -1;
 }
 
 int uv_rawpkt_membership(uv_rawpkt_t* rawpkt,
-                                   uint8_t* multicast_addr,
-                                   uv_membership membership)
+                         uint8_t* multicast_addr,
+                         uv_membership membership)
 {
     return -1;
 }
 
 int uv_rawpkt_send(uv_rawpkt_send_t* req,
-                             uv_rawpkt_t* handle,
-                             const uv_buf_t bufs[],
-                             unsigned int nbufs,
-                             uv_rawpkt_send_cb send_cb)
+                   uv_rawpkt_t* handle,
+                   const uv_buf_t bufs[],
+                   unsigned int nbufs,
+                   uv_rawpkt_send_cb send_cb)
 {
     return -1;
 }
 
 int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
-                                   uv_alloc_cb alloc_cb,
-                                   uv_rawpkt_recv_cb recv_cb)
+                         uv_alloc_cb alloc_cb,
+                         uv_rawpkt_recv_cb recv_cb)
 {
     return -1;
 }

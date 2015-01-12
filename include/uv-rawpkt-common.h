@@ -112,7 +112,8 @@ UVRAWPKT_EXTERN int uv_rawpkt_init(uv_loop_t* loop,
  */
 UVRAWPKT_EXTERN int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                                    const char* device_name,
-                                   int promiscuous);
+                                   int promiscuous,
+                                   uint16_t *ethertype );
 
 
 /**
