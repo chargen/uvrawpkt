@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 set(PROJECT "uv_rawpkt")
-project(${RPOJECT} C)
+
+project(${PROJECT} LANGUAGES "C" )
 
 if( $ENV{LIBUVDIR} )
   set(LIBUVDIR $ENV{LIBUVDIR} )
