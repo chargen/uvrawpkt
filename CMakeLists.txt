@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 set(PROJECT "uvrawpkt")
 
-project(${PROJECT} LANGUAGES "C" )
+project(${PROJECT} C CXX )
 
 if( $ENV{LIBUVDIR} )
   set(LIBUVDIR $ENV{LIBUVDIR} )
