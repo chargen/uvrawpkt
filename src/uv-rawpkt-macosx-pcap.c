@@ -37,7 +37,7 @@ static uv_rawpkt_iter_node_t *uv_rawpkt_iter_add_node(
         const char *device_name,
         const char *device_description)
 {
-    uv_rawpkt_iter_node_t *node = malloc(sizeof(uv_rawpkt_iter_node_t));
+    uv_rawpkt_iter_node_t *node = calloc(sizeof(uv_rawpkt_iter_node_t),1);
     if( node )
     {
         node->device_description = strdup(device_description);
