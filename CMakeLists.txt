@@ -20,7 +20,7 @@ if( WIN32 )
 elseif( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
     set(LIBS ${LIBS} pcap)
 elseif( ${CMAKE_SYSTEM_NAME} MATCHES "Linux" )
-   set( LIBS ${LIBS} m rt )
+   set( LIBS ${LIBS} pcap m rt )
 endif()
 
 IF (APPLE)
