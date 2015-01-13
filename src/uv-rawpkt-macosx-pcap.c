@@ -3,22 +3,35 @@
 
 #if defined(__APPLE__)
 
+#include <pcap.h>
+
+static void uv_rawpkt_iter_timer(uv_timer_t* handle)
+{
+    uv_rawpkt_iter_t *self = (uv_rawpkt_iter_t *)handle;
+    /* TODO: Scan pcap for devices, add/remove them and send callbacks */
+}
+
 int uv_rawpkt_iter_init(uv_loop_t* loop,
                         uv_rawpkt_iter_t* iter)
 {
-    return -1;
+    bzero(iter,sizeof(*iter));
+    return uv_timer_init(loop,&iter->scan_timer);
 }
 
 int uv_rawpkt_iter_start(uv_rawpkt_iter_t* iter,
-                         uv_rawpkt_iter_found_cb* found_cb,
-                         uv_rawpkt_iter_removed_cb* removed_cb)
+                         uv_rawpkt_iter_found_cb found_cb,
+                         uv_rawpkt_iter_removed_cb removed_cb)
 {
+    iter->added_cb = found_cb;
+    iter->removed_cb = removed_cb;
+    iter->scan_timer.data = (void *)iter;
+    uv_timer_start(&iter->scan_timer,uv_rawpkt_iter_timer,0,1000);
     return -1;
 }
 
 void uv_rawpkt_iter_stop(uv_rawpkt_iter_t* iter)
 {
-
+    uv_timer_stop(&iter->scan_timer);
 }
 
 int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )

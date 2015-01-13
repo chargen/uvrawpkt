@@ -86,8 +86,8 @@ UVRAWPKT_EXTERN int uv_rawpkt_iter_init(uv_loop_t* loop,
  * @return
  */
 UVRAWPKT_EXTERN int uv_rawpkt_iter_start(uv_rawpkt_iter_t* iter,
-                                         uv_rawpkt_iter_found_cb* found_cb,
-                                         uv_rawpkt_iter_removed_cb* removed_cb);
+                                         uv_rawpkt_iter_found_cb found_cb,
+                                         uv_rawpkt_iter_removed_cb removed_cb);
 /**
  * @brief uv_rawpkt_iter_stop
  * @param iter
