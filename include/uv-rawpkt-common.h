@@ -2,6 +2,7 @@
 #define UV_RAWPKT_COMMON_H
 
 #include "uv.h"
+#include <stdlib.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -56,16 +57,11 @@ typedef void (*uv_rawpkt_link_status_cb)(struct uv_rawpkt_s* handle,
                                          int link_status);
 
 /**
- * Callback function signature for when a network port is found
+ * Callback function signature for when a network port is found or removed
  */
-typedef void (*uv_rawpkt_iter_found_cb)(struct uv_rawpkt_iter_s* handle,
-                                        const char *device_name );
-
-/**
- * Callback function signature for when a network port is removed
- */
-typedef void (*uv_rawpkt_iter_removed_cb)(struct uv_rawpkt_iter_s* handle,
-                                          const char *device_name );
+typedef void (*uv_rawpkt_iter_cb)(struct uv_rawpkt_iter_s* handle,
+                                  const char *device_name,
+                                  const char *device_description );
 
 
 /**
@@ -86,8 +82,8 @@ UVRAWPKT_EXTERN int uv_rawpkt_iter_init(uv_loop_t* loop,
  * @return
  */
 UVRAWPKT_EXTERN int uv_rawpkt_iter_start(uv_rawpkt_iter_t* iter,
-                                         uv_rawpkt_iter_found_cb found_cb,
-                                         uv_rawpkt_iter_removed_cb removed_cb);
+                                         uv_rawpkt_iter_cb found_cb,
+                                         uv_rawpkt_iter_cb removed_cb);
 /**
  * @brief uv_rawpkt_iter_stop
  * @param iter

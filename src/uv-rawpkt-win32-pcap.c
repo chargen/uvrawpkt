@@ -3,6 +3,10 @@
 
 #if defined(_WIN32)
 
+#include <iphlpapi.h>
+#include <ws2_32.h>
+#include <pcap.h>
+
 #  pragma comment(lib, "IPHLPAPI.lib")
 #  pragma comment(lib, "wpcap.lib" )
 #  pragma comment(lib, "ws2_32.lib" )

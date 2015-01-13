@@ -44,7 +44,10 @@ struct uv_rawpkt_send_s
 struct uv_rawpkt_iter_node_s
 {
     struct uv_rawpkt_iter_node_s *next;
-    const char *device_name;
+    struct uv_rawpkt_iter_node_s *prev;
+    int seen;
+    char *device_name;
+    char *device_description;
 };
 
 /**
@@ -54,11 +57,13 @@ struct uv_rawpkt_iter_node_s
  */
 struct uv_rawpkt_iter_s
 {
+    void *data;
     uv_timer_t scan_timer;
-    uv_rawpkt_iter_found_cb added_cb;
-    uv_rawpkt_iter_removed_cb removed_cb;
+    uv_rawpkt_iter_cb added_cb;
+    uv_rawpkt_iter_cb removed_cb;
 
     struct uv_rawpkt_iter_node_s *first;
+    struct uv_rawpkt_iter_node_s *last;
 };
 
 
