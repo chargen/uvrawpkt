@@ -19,6 +19,8 @@ if( WIN32 )
     link_directories($ENV{PCAP_LIBRARY})
 elseif( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
     set(LIBS ${LIBS} pcap)
+elseif( ${CMAKE_SYSTEM_NAME} MATCHES "Linux" )
+   set( LIBS ${LIBS} m rt )
 endif()
 
 IF (APPLE)
