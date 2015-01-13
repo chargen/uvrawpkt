@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8)
-set(PROJECT "uv_rawpkt")
+set(PROJECT "uvrawpkt")
 
 project(${PROJECT} LANGUAGES "C" )
 
