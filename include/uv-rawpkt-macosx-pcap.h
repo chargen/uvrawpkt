@@ -16,12 +16,14 @@ extern "C" {
  */
 struct uv_rawpkt_s
 {
-    uv_handle_t handle;
-    uv_timer_t link_status_timer;
+    uv_poll_t handle;
+    uv_loop_t *loop;
     int link_status;
+    uv_timer_t link_status_timer;
     uv_rawpkt_link_status_cb link_status_cb;
     uv_rawpkt_recv_cb recv_cb;
     const char *device_name;
+    void *pcap;
 };
 
 /**

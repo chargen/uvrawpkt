@@ -197,7 +197,9 @@ int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 
 int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    const char* device_name,
+                   int snaplen,
                    int promiscuous,
+                   int to_ms,
                    uint16_t *ethertype )
 {
     return -1;

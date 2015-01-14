@@ -109,7 +109,9 @@ UVRAWPKT_EXTERN int uv_rawpkt_init(uv_loop_t* loop,
  */
 UVRAWPKT_EXTERN int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                                    const char* device_name,
+                                   int snaplen,
                                    int promiscuous,
+                                   int to_ms,
                                    uint16_t *ethertype );
 
 
@@ -165,7 +167,6 @@ UVRAWPKT_EXTERN int uv_rawpkt_send(uv_rawpkt_send_t* req,
  * @return
  */
 UVRAWPKT_EXTERN int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
-                                         uv_alloc_cb alloc_cb,
                                          uv_rawpkt_recv_cb recv_cb);
 
 
@@ -191,8 +192,7 @@ UVRAWPKT_EXTERN int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
  * @param link_status_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle,
-                                               uv_rawpkt_link_status_cb link_status_cb);
+UVRAWPKT_EXTERN int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle);
 
 #ifdef __cplusplus
 }

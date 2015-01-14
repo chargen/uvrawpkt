@@ -5,6 +5,13 @@
 #include <net/if_dl.h>
 #include <pcap.h>
 
+static void uv_rawpkt_link_status_timer(uv_timer_t* handle);
+static void uv_rawpkt_readable(uv_poll_t* handle, int status, int events);
+static void uv_rawpkt_readable_pcap_handler(u_char *user,
+                                            const struct pcap_pkthdr *h,
+                                            const u_char *bytes);
+
+
 static void uv_rawpkt_iter_timer(uv_timer_t* handle);
 static void uv_rawpkt_iter_clear_seen_node(
         uv_rawpkt_iter_t* iter );
@@ -18,6 +25,59 @@ static void uv_rawpkt_iter_free_node(
 static uv_rawpkt_iter_node_t * uv_rawpkt_iter_find_node(
         uv_rawpkt_iter_t* iter,
         const char *device_name);
+
+
+static void uv_rawpkt_link_status_timer(uv_timer_t* handle)
+{
+    int new_status=0;
+    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
+    /* TODO: poll link status */
+
+    if( new_status != rawpkt->link_status )
+    {
+        rawpkt->link_status = new_status;
+        if( rawpkt->link_status_cb )
+        {
+            rawpkt->link_status_cb(rawpkt,rawpkt->link_status);
+        }
+    }
+}
+
+static void uv_rawpkt_readable(uv_poll_t* handle, int status, int events)
+{
+    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
+    pcap_t *pcap = (pcap_t *)rawpkt->pcap;
+
+    if( status==0 )
+    {
+        if( events & UV_READABLE )
+        {
+            struct pcap_pkthdr pkthdr;
+
+            while( pcap_dispatch(pcap,1,uv_rawpkt_readable_pcap_handler,(u_char *)rawpkt) > 0 )
+            {
+                ;
+            }
+        }
+    }
+}
+
+static void uv_rawpkt_readable_pcap_handler(u_char *user,
+                                            const struct pcap_pkthdr *h,
+                                            const u_char *bytes)
+{
+    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)user;
+
+    uv_buf_t buf;
+    buf.base = (char *)bytes;
+    buf.len = h->caplen;
+
+    if( rawpkt->recv_cb )
+    {
+        rawpkt->recv_cb(rawpkt,1,&buf);
+    }
+}
+
 
 static void uv_rawpkt_iter_clear_seen_node(
         uv_rawpkt_iter_t* iter )
@@ -190,25 +250,63 @@ void uv_rawpkt_iter_stop(uv_rawpkt_iter_t* iter)
 
 int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 {
-    return -1;
+    bzero(rawpkt,sizeof(uv_rawpkt_t));
+    rawpkt->loop = loop;
+    rawpkt->link_status=0;
+    return uv_timer_init(loop,&rawpkt->link_status_timer);
 }
+
 
 int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    const char* device_name,
+                   int snaplen,
                    int promiscuous,
+                   int to_ms,
                    uint16_t *ethertype )
 {
-    return -1;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *pcap;
+
+    pcap=pcap_open_live(device_name,snaplen,promiscuous,to_ms,errbuf);
+    if( pcap )
+    {
+        rawpkt->pcap = (void *)pcap;
+        rawpkt->link_status_timer.data = (void *)rawpkt;
+
+        /* TODO: Set ethertype filter if ethertype is set */
+
+        if( uv_poll_init_socket(rawpkt->loop,&rawpkt->handle,pcap_get_selectable_fd(pcap))==0 )
+        {
+            rawpkt->handle.data = (void *)rawpkt;
+            rawpkt->device_name = strdup(device_name);
+            uv_timer_start(&rawpkt->link_status_timer,uv_rawpkt_link_status_timer,0,1000);
+            uv_poll_start(&rawpkt->handle,UV_READABLE,uv_rawpkt_readable);
+
+            return 0;
+        }
+        else
+        {
+            return -1;
+        }
+    }
+    else
+    {
+        return -1;
+    }
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
                      uv_close_cb close_cb)
 {
+    uv_poll_stop(&rawpkt->handle);
+    uv_timer_stop(&rawpkt->link_status_timer);
+    uv_close( (uv_handle_t *)&rawpkt->handle, close_cb );
 }
 
 int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
                      uint8_t *eui48)
 {
+    /** TODO: getmac */
     return -1;
 }
 
@@ -216,6 +314,7 @@ int uv_rawpkt_membership(uv_rawpkt_t* rawpkt,
                          uint8_t* multicast_addr,
                          uv_membership membership)
 {
+    /** TODO: membership */
     return -1;
 }
 
@@ -225,31 +324,39 @@ int uv_rawpkt_send(uv_rawpkt_send_t* req,
                    unsigned int nbufs,
                    uv_rawpkt_send_cb send_cb)
 {
-    return -1;
+    pcap_t *pcap = (pcap_t *)handle->pcap;
+    unsigned int i;
+    for( i=0; i<nbufs; ++i )
+    {
+        pcap_sendpacket(pcap,(const u_char *)bufs[i].base,bufs[i].len);
+    }
+    return 0;
 }
 
 int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
-                         uv_alloc_cb alloc_cb,
                          uv_rawpkt_recv_cb recv_cb)
 {
-    return -1;
+    handle->recv_cb = recv_cb;
+    return 0;
 }
 
 int uv_rawpkt_recv_stop(uv_rawpkt_t* handle)
 {
-    return -1;
+    handle->recv_cb = 0;
+    return 0;
 }
 
 int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
                                 uv_rawpkt_link_status_cb link_status_cb)
 {
-    return -1;
+    handle->link_status_cb = link_status_cb;
+    return 0;
 }
 
-int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle,
-                               uv_rawpkt_link_status_cb link_status_cb)
+int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle)
 {
-    return -1;
+    handle->link_status_cb = 0;
+    return 0;
 }
 
 #else
