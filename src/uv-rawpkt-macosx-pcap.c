@@ -199,8 +199,8 @@ int uv_rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
             macpos = (uint8_t const *)dl->sdl_data + dl->sdl_nlen;
 
             memcpy( mac, macpos, 6 );
-            if( mac[0]!=0 && mac[1]!=0 && mac[2]!=0
-                    && mac[3]!=0 && mac[4]!=0 && mac[5]!=0 )
+            if( mac[0]!=0 || mac[1]!=0 || mac[2]!=0
+                    || mac[3]!=0 || mac[4]!=0 || mac[5]!=0 )
             {
                 r=0;
             }
