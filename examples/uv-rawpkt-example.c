@@ -20,19 +20,24 @@ static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t 
 
 static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t *buf )
 {
-    int i=0;
-    if( nread>0 )
+    int bufnum=0;
+    port_context_t *context = (port_context_t *)rawpkt->data;
+    const uint8_t *mac = rawpkt->mac;
+    printf("From: %02X:%02X:%02X:%02X:%02X:%02X :",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    for( bufnum=0; bufnum<nread; ++bufnum )
     {
-        port_context_t *context = (port_context_t *)rawpkt->data;
-        const uint8_t *mac = rawpkt->mac;
-        printf("From: %02X:%02X:%02X:%02X:%02X:%02X :",
-                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-        for( i=0; i<nread; ++i )
+        int i;
+        uint8_t *p = (uint8_t *)buf[bufnum].base;
+
+        for( i=0; i<buf[bufnum].len; ++i )
         {
-            printf("%02X ",(uint16_t)buf->base[i]);
+            printf("%02X ",(uint16_t)p[i]);
         }
         printf( "\n" );
     }
+    fflush(stdout);
 }
 
 static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const char *description, const uint8_t *mac )
