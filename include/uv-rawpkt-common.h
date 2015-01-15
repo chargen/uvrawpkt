@@ -62,7 +62,8 @@ typedef void (*uv_rawpkt_link_status_cb)(struct uv_rawpkt_s* handle,
  */
 typedef void (*uv_rawpkt_iter_cb)(struct uv_rawpkt_iter_s* handle,
                                   const char *device_name,
-                                  const char *device_description );
+                                  const char *device_description,
+                                  const uint8_t *mac );
 
 
 /**
@@ -112,7 +113,8 @@ UVRAWPKT_EXTERN int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                                    int snaplen,
                                    int promiscuous,
                                    int to_ms,
-                                   uint16_t *ethertype );
+                                   uint16_t *ethertype,
+                                   const uint8_t *mac );
 
 
 /**

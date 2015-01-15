@@ -5,6 +5,19 @@
 #include <net/if_dl.h>
 #include <pcap.h>
 
+
+static int uv_rawpkt_pcap_open(
+        uv_rawpkt_t* rawpkt,
+        const char* device_name,
+        int snaplen,
+        int promiscuous,
+        int to_ms,
+        int buffer_size,
+        const char *filter );
+
+static int uv_rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
+                                         uint8_t *mac );
+
 static void uv_rawpkt_link_status_timer(uv_timer_t* handle);
 static void uv_rawpkt_readable(uv_poll_t* handle, int status, int events);
 static void uv_rawpkt_readable_pcap_handler(u_char *user,
@@ -18,7 +31,8 @@ static void uv_rawpkt_iter_clear_seen_node(
 static uv_rawpkt_iter_node_t *uv_rawpkt_iter_add_node(
         uv_rawpkt_iter_t* iter,
         const char *device_name,
-        const char *device_description);
+        const char *device_description,
+        const uint8_t *mac );
 static void uv_rawpkt_iter_free_node(
         uv_rawpkt_iter_t* iter,
         uv_rawpkt_iter_node_t* node );
@@ -27,7 +41,7 @@ static uv_rawpkt_iter_node_t * uv_rawpkt_iter_find_node(
         const char *device_name);
 
 
-static void uv_rawpkt_link_status_timer(uv_timer_t* handle)
+void uv_rawpkt_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
@@ -43,7 +57,7 @@ static void uv_rawpkt_link_status_timer(uv_timer_t* handle)
     }
 }
 
-static void uv_rawpkt_readable(uv_poll_t* handle, int status, int events)
+void uv_rawpkt_readable(uv_poll_t* handle, int status, int events)
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
     pcap_t *pcap = (pcap_t *)rawpkt->pcap;
@@ -62,7 +76,7 @@ static void uv_rawpkt_readable(uv_poll_t* handle, int status, int events)
     }
 }
 
-static void uv_rawpkt_readable_pcap_handler(u_char *user,
+void uv_rawpkt_readable_pcap_handler(u_char *user,
                                             const struct pcap_pkthdr *h,
                                             const u_char *bytes)
 {
@@ -79,7 +93,7 @@ static void uv_rawpkt_readable_pcap_handler(u_char *user,
 }
 
 
-static void uv_rawpkt_iter_clear_seen_node(
+void uv_rawpkt_iter_clear_seen_node(
         uv_rawpkt_iter_t* iter )
 {
     uv_rawpkt_iter_node_t *cur=iter->first;
@@ -92,16 +106,18 @@ static void uv_rawpkt_iter_clear_seen_node(
 
 }
 
-static uv_rawpkt_iter_node_t *uv_rawpkt_iter_add_node(
+uv_rawpkt_iter_node_t *uv_rawpkt_iter_add_node(
         uv_rawpkt_iter_t* iter,
         const char *device_name,
-        const char *device_description)
+        const char *device_description,
+        const uint8_t *mac )
 {
     uv_rawpkt_iter_node_t *node = calloc(sizeof(uv_rawpkt_iter_node_t),1);
     if( node )
     {
         node->device_description = strdup(device_description);
         node->device_name = strdup(device_name);
+        memcpy( node->mac, mac, 6 );
         node->seen=1;
         if( iter->first==0 )
         {
@@ -118,7 +134,7 @@ static uv_rawpkt_iter_node_t *uv_rawpkt_iter_add_node(
     return node;
 }
 
-static void uv_rawpkt_iter_free_node(
+void uv_rawpkt_iter_free_node(
         uv_rawpkt_iter_t* iter,
         uv_rawpkt_iter_node_t* node )
 {
@@ -147,7 +163,7 @@ static void uv_rawpkt_iter_free_node(
 }
 
 
-static uv_rawpkt_iter_node_t * uv_rawpkt_iter_find_node(
+uv_rawpkt_iter_node_t * uv_rawpkt_iter_find_node(
         uv_rawpkt_iter_t* iter,
         const char *device_name )
 {
@@ -167,7 +183,34 @@ static uv_rawpkt_iter_node_t * uv_rawpkt_iter_find_node(
     return result;
 }
 
-static void uv_rawpkt_iter_timer(uv_timer_t* handle)
+int uv_rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
+                                  uint8_t *mac )
+{
+    int r=-1;
+    pcap_addr_t *alladdrs;
+    pcap_addr_t *a;
+    alladdrs = pcap_if->addresses;
+    for ( a = alladdrs; a != NULL; a = a->next )
+    {
+        if ( a->addr->sa_family == AF_LINK )
+        {
+            uint8_t const *macpos;
+            struct sockaddr_dl *dl = (struct sockaddr_dl *)a->addr;
+            macpos = (uint8_t const *)dl->sdl_data + dl->sdl_nlen;
+
+            memcpy( mac, macpos, 6 );
+            if( mac[0]!=0 && mac[1]!=0 && mac[2]!=0
+                    && mac[3]!=0 && mac[4]!=0 && mac[5]!=0 )
+            {
+                r=0;
+            }
+            break;
+        }
+    }
+    return r;
+}
+
+void uv_rawpkt_iter_timer(uv_timer_t* handle)
 {
     char errbuf[PCAP_ERRBUF_SIZE];
     uv_rawpkt_iter_node_t *node;
@@ -182,26 +225,32 @@ static void uv_rawpkt_iter_timer(uv_timer_t* handle)
     cur=items;
     while( cur )
     {
-        if( !(cur->flags & PCAP_IF_LOOPBACK) )
+        if( !(cur->flags & PCAP_IF_LOOPBACK))
         {
-            node = uv_rawpkt_iter_find_node(self,cur->name);
-            if( node==0 )
+            uint8_t mac[6];
+            if( uv_rawpkt_iter_pcap_read_mac(cur,mac)==0 )
             {
-                node = uv_rawpkt_iter_add_node(
-                            self,
-                            cur->name,
-                            cur->description ? cur->description : "");
-                if( node )
+                node = uv_rawpkt_iter_find_node(self,cur->name);
+                if( node==0 )
                 {
-                    self->added_cb(
+                    node = uv_rawpkt_iter_add_node(
                                 self,
-                                node->device_name,
-                                node->device_description );
+                                cur->name,
+                                cur->description ? cur->description : "",
+                                mac);
+                    if( node )
+                    {
+                        self->added_cb(
+                                    self,
+                                    node->device_name,
+                                    node->device_description,
+                                    mac );
+                    }
                 }
-            }
-            else
-            {
-                node->seen=1;
+                else
+                {
+                    node->seen=1;
+                }
             }
         }
         cur = cur->next;
@@ -215,7 +264,7 @@ static void uv_rawpkt_iter_timer(uv_timer_t* handle)
         {
             uv_rawpkt_iter_node_t *next = node->next;
 
-            self->removed_cb( self, node->device_name, node->device_description );
+            self->removed_cb( self, node->device_name, node->device_description, node->mac );
             uv_rawpkt_iter_free_node( self, node );
             node = next;
         }
@@ -257,31 +306,131 @@ int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 }
 
 
+
+int uv_rawpkt_pcap_open(
+        uv_rawpkt_t* rawpkt,
+        const char* device_name,
+        int snaplen,
+        int promiscuous,
+        int to_ms,
+        int buffer_size,
+        const char *filter )
+{
+    int status=-1;
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *pcap=0;
+    struct bpf_program fcode;
+    int dl;
+
+    pcap = pcap_create(device_name,errbuf);
+
+    if( pcap )
+    {
+        status = 0;
+
+        if( status >=0 )
+        {
+            status = pcap_set_snaplen(pcap, snaplen);
+        }
+        if( status >=0 )
+        {
+            status = pcap_set_promisc(pcap, promiscuous);
+        }
+        if( status >=0 )
+        {
+            status = pcap_set_timeout(pcap, to_ms);
+        }
+        if( status >=0 )
+        {
+            status = pcap_set_buffer_size(pcap, buffer_size);
+        }
+        if( status >=0 )
+        {
+            pcap_setdirection(pcap,PCAP_D_IN);
+        }
+        if( status>=0 )
+        {
+            status = pcap_activate(pcap);
+        }
+        if( status >=0 && filter )
+        {
+            status = pcap_compile ( pcap, &fcode, filter, 1, 0xffffffff );
+
+            if( status >=0 )
+            {
+                status = pcap_setfilter ( pcap, &fcode );
+                pcap_freecode ( &fcode );
+            }
+            else
+            {
+                printf( "pcap_compile error: %s\n", pcap_geterr(pcap) );
+            }
+        }
+
+
+        if( status >=0 )
+        {
+            rawpkt->pcap = (void *)pcap;
+        }
+
+        if( status < 0 )
+        {
+            pcap_close(pcap);
+        }
+    }
+
+    return status;
+}
+
 int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    const char* device_name,
                    int snaplen,
                    int promiscuous,
                    int to_ms,
-                   uint16_t *ethertype )
+                   uint16_t *ethertype,
+                   const uint8_t *mac )
 {
     char errbuf[PCAP_ERRBUF_SIZE];
-    pcap_t *pcap;
+    pcap_t *pcap = 0;
+    char filter[1024]="";
+    int status=-1;
+    int buffer_size=1*1024*1024;
 
-    pcap=pcap_open_live(device_name,snaplen,promiscuous,to_ms,errbuf);
-    if( pcap )
+    if( ethertype )
     {
-        rawpkt->pcap = (void *)pcap;
+        sprintf ( filter, "ether proto 0x%04x", *ethertype );
+    }
+
+    status = uv_rawpkt_pcap_open(
+                rawpkt,
+                device_name,
+                snaplen,
+                promiscuous,
+                to_ms,
+                buffer_size,
+                filter);
+
+    if( status>=0 )
+    {
+        pcap =(pcap_t *)rawpkt->pcap;
+        int fd = pcap_get_selectable_fd(pcap);
         rawpkt->link_status_timer.data = (void *)rawpkt;
-
-        /* TODO: Set ethertype filter if ethertype is set */
-
-        if( uv_poll_init_socket(rawpkt->loop,&rawpkt->handle,pcap_get_selectable_fd(pcap))==0 )
+        memcpy( rawpkt->mac, mac, 6 );
+        if( uv_poll_init_socket(
+                    rawpkt->loop,&rawpkt->handle,
+                    fd)==0 )
         {
             rawpkt->handle.data = (void *)rawpkt;
-            rawpkt->device_name = strdup(device_name);
-            uv_timer_start(&rawpkt->link_status_timer,uv_rawpkt_link_status_timer,0,1000);
-            uv_poll_start(&rawpkt->handle,UV_READABLE,uv_rawpkt_readable);
-
+            strcpy(rawpkt->device_name,device_name);
+            uv_timer_start(
+                        &rawpkt->link_status_timer,
+                        uv_rawpkt_link_status_timer,
+                        0,
+                        1000);
+            uv_poll_start(
+                        &rawpkt->handle,
+                        UV_READABLE,
+                        uv_rawpkt_readable);
             return 0;
         }
         else
@@ -289,10 +438,8 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
             return -1;
         }
     }
-    else
-    {
-        return -1;
-    }
+
+    return status;
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
@@ -304,10 +451,11 @@ void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
 }
 
 int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
-                     uint8_t *eui48)
+                     uint8_t *mac)
 {
-    /** TODO: getmac */
-    return -1;
+    pcap_t *pcap = (pcap_t *)rawpkt->pcap;
+    memcpy( mac, rawpkt->mac, 6 );
+    return 0;
 }
 
 int uv_rawpkt_membership(uv_rawpkt_t* rawpkt,
