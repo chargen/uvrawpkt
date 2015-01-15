@@ -18,6 +18,7 @@ struct uv_rawpkt_s
 {
     uv_poll_t handle;
     void *pcap;
+    void *data;
     uv_loop_t *loop;
     int link_status;
     uv_timer_t link_status_timer;

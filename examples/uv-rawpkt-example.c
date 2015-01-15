@@ -23,6 +23,7 @@ static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t 
     int i=0;
     if( nread>0 )
     {
+        port_context_t *context = (port_context_t *)rawpkt->data;
         const uint8_t *mac = rawpkt->mac;
         printf("From: %02X:%02X:%02X:%02X:%02X:%02X :",
                 mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -41,22 +42,22 @@ static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const cha
     printf( "Found  : %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n", name, description, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
     fflush(stdout);
 
-    if( name[0]=='e' && name[1]=='n' && name[2]>'0')
     {
         context=calloc(sizeof(port_context_t),1);
         if( context )
         {
             int status=-1;
             status = uv_rawpkt_init(uv_default_loop(),&context->rawpkt);
+            context->rawpkt.data = (void *)context;
 
             if( status>=0 )
             {
-                uint16_t ethertype=0x0801;
+                uint16_t ethertype=0x0800;
                 status = uv_rawpkt_open(
                             &context->rawpkt,
                             name,
                             65536,
-                            1,
+                            0,
                             10,
                             &ethertype,
                             mac
