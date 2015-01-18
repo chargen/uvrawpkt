@@ -12,18 +12,25 @@
 #  pragma comment(lib, "ws2_32.lib" )
 
 
-void uv__rawpkt_link_status_timer(uv_timer_t* handle)
+void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
-    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
+    uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
     /* TODO: poll link status */
 
-    if( new_status != rawpkt->link_status )
+    if( new_status != network_port->link_status )
     {
-        rawpkt->link_status = new_status;
-        if( rawpkt->link_status_cb )
+        uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+
+        network_port->link_status = new_status;
+
+        while( rawpkt )
         {
-            rawpkt->link_status_cb(rawpkt,rawpkt->link_status);
+            if( rawpkt->link_status_cb )
+            {
+                rawpkt->link_status_cb(rawpkt,new_status);
+            }
+            rawpkt=rawpkt->next;
         }
     }
 }
@@ -105,10 +112,11 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
         pcap =(pcap_t *)rawpkt->pcap;
 
         uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
-        /* TODO: Add HANDLE for WaitForObject usage in Win32 */
+        /* TODO: use Win32 mechanism for async message from libpcap
+         * instead of selectable fd which is not available
+         */
 #if 0
         int fd = pcap_get_selectable_fd(pcap);
-        rawpkt->link_status_timer.data = (void *)rawpkt;
 
         if( uv_poll_init_socket(
                     rawpkt->loop,&rawpkt->handle,
@@ -116,22 +124,17 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
         {
             rawpkt->handle.data = (void *)rawpkt;
 
-            uv_timer_start(
-                        &rawpkt->link_status_timer,
-                        uv__rawpkt_link_status_timer,
-                        0,
-                        1000);
             uv_poll_start(
                         &rawpkt->handle,
                         UV_READABLE,
                         uv__rawpkt_readable);
-#endif
             return 0;
         }
         else
         {
             return -1;
         }
+#endif
     }
 
     return status;
@@ -141,7 +144,6 @@ void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
     uv_poll_stop(&rawpkt->handle);
-    uv_timer_stop(&rawpkt->link_status_timer);
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {

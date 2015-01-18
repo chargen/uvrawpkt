@@ -28,12 +28,44 @@ void uv_rawpkt_network_port_iterator_stop(uv_rawpkt_network_port_iterator_t* ite
     uv_timer_stop(&iter->scan_timer);
 }
 
+void uv_rawpkt_network_port_iterator_close(uv_rawpkt_network_port_iterator_t* iter,
+                                           uv_close_cb close_cb )
+{
+    uv_rawpkt_network_port_t *port;
+
+    uv_timer_stop(&iter->scan_timer);
+
+    /* iterate through all network ports */
+    port = iter->first;
+    while( port )
+    {
+        uv_rawpkt_t *rawpkt;
+
+        /* iterate through all rawpkt sockets open on this network port */
+        rawpkt = port->first_rawpkt;
+        while( rawpkt )
+        {
+            /* close it */
+            uv_rawpkt_close(rawpkt);
+            rawpkt = rawpkt->next;
+        }
+
+        uv_timer_stop(&port->link_status_timer);
+
+        port = port->next;
+    }
+
+    if( close_cb )
+    {
+        close_cb( (uv_handle_t *)&iter );
+    }
+}
+
 int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 {
     bzero(rawpkt,sizeof(uv_rawpkt_t));
     rawpkt->loop = loop;
-    rawpkt->link_status=0;
-    return uv_timer_init(loop,&rawpkt->link_status_timer);
+    return 0;
 }
 
 

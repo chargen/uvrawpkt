@@ -23,8 +23,6 @@ struct uv_rawpkt_s
     struct pcap *pcap;
     void *data;
     uv_loop_t *loop;
-    int link_status;
-    uv_timer_t link_status_timer;
     uv_rawpkt_link_status_cb link_status_cb;
     uv_rawpkt_recv_cb recv_cb;
     uv_close_cb close_cb;
@@ -46,12 +44,14 @@ struct uv_rawpkt_send_s
 };
 
 /**
- * @brief The uv_rawpkt_iter_node_s struct
+ * @brief The uv_rawpkt_iter_network_port_s struct
  *
  * Maintains the context of a single discovered network port
  */
 struct uv_rawpkt_network_port_s
 {
+    uv_timer_t link_status_timer;
+    int link_status;
     struct uv_rawpkt_network_port_s *next;
     struct uv_rawpkt_network_port_s *prev;
     int seen;
@@ -63,15 +63,15 @@ struct uv_rawpkt_network_port_s
 };
 
 /**
- * @brief The uv_rawpkt_iter_s struct
+ * @brief The uv_rawpkt_network_port_iterator_s struct
  *
  * Manages the discovery and removal events of an ethernet network port
  */
 struct uv_rawpkt_network_port_iterator_s
 {
+    uv_timer_t scan_timer;
     void *data;
     uv_loop_t *loop;
-    uv_timer_t scan_timer;
     uv_rawpkt_network_port_iterator_cb added_cb;
     uv_rawpkt_network_port_iterator_cb removed_cb;
 
@@ -114,10 +114,10 @@ void uv_rawpkt_closed( uv_handle_t *handle );
 UVRAWPKT_EXTERN void uv_rawpkt_close(uv_rawpkt_t* rawpkt);
 
 /**
- * @brief uv__rawpkt_link_status_timer
+ * @brief uv__rawpkt_network_port_link_status_timer
  * @param handle
  */
-void uv__rawpkt_link_status_timer(uv_timer_t* handle);
+void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle);
 
 /**
  * @brief uv__rawpkt_readable

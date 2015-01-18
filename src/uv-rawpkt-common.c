@@ -23,6 +23,14 @@ uv_rawpkt_network_port_t *uv__rawpkt_iter_add_network_port(
     uv_rawpkt_network_port_t *node = calloc(sizeof(uv_rawpkt_network_port_t),1);
     if( node )
     {
+        uv_timer_init(iter->loop,&node->link_status_timer);
+        node->link_status_timer.data = (void *)node;
+        uv_timer_start(
+                    &node->link_status_timer,
+                    uv__rawpkt_network_port_link_status_timer,
+                    0,
+                    1000);
+
         node->device_description = strdup(device_description);
         node->device_name = strdup(device_name);
         memcpy( node->mac, mac, 6 );

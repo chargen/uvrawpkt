@@ -99,6 +99,15 @@ UVRAWPKT_EXTERN
 void uv_rawpkt_network_port_iterator_stop(uv_rawpkt_network_port_iterator_t* iter);
 
 /**
+ * @brief uv_rawpkt_network_port_iterator_close
+ * @param iter
+ * @param close_cb
+ */
+UVRAWPKT_EXTERN
+void uv_rawpkt_network_port_iterator_close(uv_rawpkt_network_port_iterator_t* iter,
+                                           uv_close_cb close_cb);
+
+/**
  * @brief uv_rawpkt_init
  * @param loop
  * @param rawpkt

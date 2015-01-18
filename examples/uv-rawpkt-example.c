@@ -173,14 +173,27 @@ static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
     }
 }
 
+void finish( uv_signal_t *handle, int sig )
+{
+    uv_rawpkt_network_port_iterator_t *network_port_iterator =
+            (uv_rawpkt_network_port_iterator_t *)handle->data;
+    uv_signal_stop(handle);
+    uv_rawpkt_network_port_iterator_stop( network_port_iterator );
+    uv_rawpkt_network_port_iterator_close( network_port_iterator, 0 );
+}
+
 int main()
 {
     uv_loop_t *loop = uv_default_loop();
+    uv_signal_t sigint_handle;
     uv_rawpkt_network_port_iterator_t rawpkt_iter;
     uv_rawpkt_network_port_iterator_init(loop,&rawpkt_iter);
     uv_rawpkt_network_port_iterator_start(
                 &rawpkt_iter,
                 found_interface,
                 removed_interface);
+    uv_signal_init(loop,&sigint_handle);
+    sigint_handle.data = &rawpkt_iter;
+    uv_signal_start(&sigint_handle,finish,SIGINT);
     uv_run( loop, UV_RUN_DEFAULT );
 }

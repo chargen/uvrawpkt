@@ -7,18 +7,25 @@
 
 #include <pcap.h>
 
-void uv__rawpkt_link_status_timer(uv_timer_t* handle)
+void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
-    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
+    uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
     /* TODO: poll link status */
 
-    if( new_status != rawpkt->link_status )
+    if( new_status != network_port->link_status )
     {
-        rawpkt->link_status = new_status;
-        if( rawpkt->link_status_cb )
+        uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+
+        network_port->link_status = new_status;
+
+        while( rawpkt )
         {
-            rawpkt->link_status_cb(rawpkt,rawpkt->link_status);
+            if( rawpkt->link_status_cb )
+            {
+                rawpkt->link_status_cb(rawpkt,new_status);
+            }
+            rawpkt=rawpkt->next;
         }
     }
 }
@@ -47,32 +54,7 @@ void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
 }
 
 
-int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
-                                   uint8_t *mac )
-{
-    int r=-1;
-    pcap_addr_t *alladdrs;
-    pcap_addr_t *a;
-    alladdrs = pcap_if->addresses;
-    for ( a = alladdrs; a != NULL; a = a->next )
-    {
-        if ( a->addr->sa_family == AF_LINK )
-        {
-            uint8_t const *macpos;
-            struct sockaddr_dl *dl = (struct sockaddr_dl *)a->addr;
-            macpos = (uint8_t const *)dl->sdl_data + dl->sdl_nlen;
 
-            memcpy( mac, macpos, 6 );
-            if( mac[0]!=0 || mac[1]!=0 || mac[2]!=0
-                    || mac[3]!=0 || mac[4]!=0 || mac[5]!=0 )
-            {
-                r=0;
-            }
-            break;
-        }
-    }
-    return r;
-}
 
 void uv__rawpkt_readable_pcap_handler(u_char *user,
                                       const struct pcap_pkthdr *h,
@@ -113,7 +95,7 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
     status = uv__rawpkt_pcap_open(
                 rawpkt,
-                network_port->device_name,
+                network_port,
                 snaplen,
                 promiscuous,
                 to_ms,
@@ -126,7 +108,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
         uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
         int fd = pcap_get_selectable_fd(pcap);
-        rawpkt->link_status_timer.data = (void *)rawpkt;
 
         if( uv_poll_init_socket(
                     rawpkt->loop,&rawpkt->handle,
@@ -134,11 +115,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
         {
             rawpkt->handle.data = (void *)rawpkt;
 
-            uv_timer_start(
-                        &rawpkt->link_status_timer,
-                        uv__rawpkt_link_status_timer,
-                        0,
-                        1000);
             uv_poll_start(
                         &rawpkt->handle,
                         UV_READABLE,
@@ -158,7 +134,6 @@ void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
     uv_poll_stop(&rawpkt->handle);
-    uv_timer_stop(&rawpkt->link_status_timer);
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {
