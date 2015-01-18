@@ -9,6 +9,10 @@
 extern "C" {
 #endif
 
+#ifndef UV_RAWPKT_ENABLE_PCAP
+#define UV_RAWPKT_ENABLE_PCAP 1
+#endif
+
 #ifdef _WIN32
   /* Windows - set up dll import/export decorators. */
 # if defined(BUILDING_UVRAWPKT_SHARED)
@@ -30,13 +34,13 @@ extern "C" {
 
 struct uv_rawpkt_s;
 struct uv_rawpkt_send_s;
-struct uv_rawpkt_iter_node_s;
-struct uv_rawpkt_iter_s;
+struct uv_rawpkt_network_port_s;
+struct uv_rawpkt_network_port_iterator_s;
 
 typedef struct uv_rawpkt_s uv_rawpkt_t;
 typedef struct uv_rawpkt_send_s uv_rawpkt_send_t;
-typedef struct uv_rawpkt_iter_node_s uv_rawpkt_iter_node_t;
-typedef struct uv_rawpkt_iter_s uv_rawpkt_iter_t;
+typedef struct uv_rawpkt_network_port_s uv_rawpkt_network_port_t;
+typedef struct uv_rawpkt_network_port_iterator_s uv_rawpkt_network_port_iterator_t;
 
 /**
  * Callback function signature for when a raw packet has been sent
@@ -60,70 +64,52 @@ typedef void (*uv_rawpkt_link_status_cb)(struct uv_rawpkt_s* handle,
 /**
  * Callback function signature for when a network port is found or removed
  */
-typedef void (*uv_rawpkt_iter_cb)(struct uv_rawpkt_iter_s* handle,
-                                  const char *device_name,
-                                  const char *device_description,
-                                  const uint8_t *mac );
+typedef void (*uv_rawpkt_network_port_iterator_cb)(
+        struct uv_rawpkt_network_port_iterator_s* handle,
+        struct uv_rawpkt_network_port_s* port_info );
 
 
 /**
- * @brief uv_rawpkt_iter_init
+ * @brief uv_rawpkt_network_port_iterator_init
  * @param loop
  * @param iter
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_iter_init(uv_loop_t* loop,
-                                        uv_rawpkt_iter_t* iter);
+UVRAWPKT_EXTERN
+int uv_rawpkt_network_port_iterator_init(uv_loop_t* loop,
+                                         uv_rawpkt_network_port_iterator_t* iter);
 
 
 /**
- * @brief uv_rawpkt_iter_start
+ * @brief uv_rawpkt_network_port_iterator_start
  * @param iter
  * @param found_cb
  * @param removed_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_iter_start(uv_rawpkt_iter_t* iter,
-                                         uv_rawpkt_iter_cb found_cb,
-                                         uv_rawpkt_iter_cb removed_cb);
+UVRAWPKT_EXTERN
+int uv_rawpkt_network_port_iterator_start(uv_rawpkt_network_port_iterator_t* iter,
+                                          uv_rawpkt_network_port_iterator_cb found_cb,
+                                          uv_rawpkt_network_port_iterator_cb removed_cb);
 /**
  * @brief uv_rawpkt_iter_stop
  * @param iter
  */
-UVRAWPKT_EXTERN void uv_rawpkt_iter_stop(uv_rawpkt_iter_t* iter);
+UVRAWPKT_EXTERN
+void uv_rawpkt_network_port_iterator_stop(uv_rawpkt_network_port_iterator_t* iter);
 
 /**
  * @brief uv_rawpkt_init
  * @param loop
  * @param rawpkt
+ * @param owner_port
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_init(uv_loop_t* loop,
-                                   uv_rawpkt_t* rawpkt);
-
-/**
- * @brief uv_rawpkt_open
- * @param rawpkt
- * @param device_name
- * @param promiscuous
- * @return
- */
-UVRAWPKT_EXTERN int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
-                                   const char* device_name,
-                                   int snaplen,
-                                   int promiscuous,
-                                   int to_ms,
-                                   uint16_t *ethertype,
-                                   const uint8_t *mac );
+UVRAWPKT_EXTERN
+int uv_rawpkt_init(uv_loop_t* loop,
+                   uv_rawpkt_t* rawpkt);
 
 
-/**
- * @brief uv_rawpkt_close
- * @param rawpkt
- * @param close_cb
- */
-UVRAWPKT_EXTERN void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
-                                     uv_close_cb close_cb);
 
 
 /**
@@ -132,8 +118,9 @@ UVRAWPKT_EXTERN void uv_rawpkt_close(uv_rawpkt_t* rawpkt,
  * @param eui48
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
-                                     uint8_t *eui48);
+UVRAWPKT_EXTERN
+int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
+                     uint8_t *eui48);
 
 /**
  * @brief uv_rawpkt_membership
@@ -155,11 +142,12 @@ UVRAWPKT_EXTERN int uv_rawpkt_membership(uv_rawpkt_t* rawpkt,
  * @param send_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_send(uv_rawpkt_send_t* req,
-                                   uv_rawpkt_t* handle,
-                                   const uv_buf_t bufs[],
-                                   unsigned int nbufs,
-                                   uv_rawpkt_send_cb send_cb);
+UVRAWPKT_EXTERN
+int uv_rawpkt_send(uv_rawpkt_send_t* req,
+                   uv_rawpkt_t* handle,
+                   const uv_buf_t bufs[],
+                   unsigned int nbufs,
+                   uv_rawpkt_send_cb send_cb);
 
 /**
  * @brief uv_rawpkt_recv_start
@@ -168,8 +156,9 @@ UVRAWPKT_EXTERN int uv_rawpkt_send(uv_rawpkt_send_t* req,
  * @param recv_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
-                                         uv_rawpkt_recv_cb recv_cb);
+UVRAWPKT_EXTERN
+int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
+                         uv_rawpkt_recv_cb recv_cb);
 
 
 /**
@@ -177,7 +166,8 @@ UVRAWPKT_EXTERN int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
  * @param handle
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_recv_stop(uv_rawpkt_t* handle);
+UVRAWPKT_EXTERN
+int uv_rawpkt_recv_stop(uv_rawpkt_t* handle);
 
 /**
  * @brief uv_rawpkt_link_status_start
@@ -185,8 +175,9 @@ UVRAWPKT_EXTERN int uv_rawpkt_recv_stop(uv_rawpkt_t* handle);
  * @param link_status_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
-                                                uv_rawpkt_link_status_cb link_status_cb);
+UVRAWPKT_EXTERN
+int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
+                                uv_rawpkt_link_status_cb link_status_cb);
 
 /**
  * @brief uv_rawpkt_link_status_stop
@@ -194,7 +185,30 @@ UVRAWPKT_EXTERN int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
  * @param link_status_cb
  * @return
  */
-UVRAWPKT_EXTERN int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle);
+UVRAWPKT_EXTERN
+int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle);
+
+
+/**
+ * @brief uv__rawpkt_network_port_add_rawpkt
+ * @param node
+ * @param rawpkt
+ * @return
+ */
+UVRAWPKT_EXTERN
+int uv__rawpkt_network_port_add_rawpkt(uv_rawpkt_network_port_t *node,
+                                       uv_rawpkt_t *rawpkt );
+
+
+/**
+ * @brief uv__rawpkt_network_port_remove_rawpkt
+ * @param node
+ * @param rawpkt
+ * @return
+ */
+UVRAWPKT_EXTERN
+int uv__rawpkt_network_port_remove_rawpkt(uv_rawpkt_network_port_t *node,
+                                       uv_rawpkt_t *rawpkt );
 
 #ifdef __cplusplus
 }

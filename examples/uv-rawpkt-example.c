@@ -2,8 +2,13 @@
 #include "uv-rawpkt.h"
 #include <stdio.h>
 
-static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const char *description, const uint8_t *mac );
-static void removed_interface( uv_rawpkt_iter_t *iter, const char *name, const char *description, const uint8_t *mac );
+static void found_interface(
+        uv_rawpkt_network_port_iterator_t *iter,
+        uv_rawpkt_network_port_t *port_info );
+
+static void removed_interface(
+        uv_rawpkt_network_port_iterator_t *iter,
+        uv_rawpkt_network_port_t *port_info );
 
 struct port_context_s
 {
@@ -16,13 +21,27 @@ typedef struct port_context_s port_context_t;
 port_context_t *portcontext_first = 0;
 port_context_t *portcontext_last = 0;
 
-static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t *buf );
+static void received_packet( uv_rawpkt_t *rawpkt,
+                             ssize_t nread,
+                             const uv_buf_t *buf );
 
-static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t *buf )
+static void rawpkt_closed( uv_handle_t *handle );
+
+
+static void rawpkt_closed( uv_handle_t *handle )
+{
+    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
+
+    printf( "Closed : %s\n", rawpkt->owner_network_port->device_name );
+}
+
+static void received_packet( uv_rawpkt_t *rawpkt,
+                             ssize_t nread,
+                             const uv_buf_t *buf )
 {
     int bufnum=0;
     port_context_t *context = (port_context_t *)rawpkt->data;
-    const uint8_t *mac = rawpkt->mac;
+    const uint8_t *mac = rawpkt->owner_network_port->mac;
     printf("From: %02X:%02X:%02X:%02X:%02X:%02X :",
            mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
@@ -40,11 +59,20 @@ static void received_packet( uv_rawpkt_t *rawpkt, ssize_t nread, const uv_buf_t 
     fflush(stdout);
 }
 
-static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const char *description, const uint8_t *mac )
+static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
+                             uv_rawpkt_network_port_t *network_port )
 {
     port_context_t *context=0;
 
-    printf( "Found  : %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n", name, description, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+    printf( "Found  : %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n",
+            network_port->device_name,
+            network_port->device_description,
+            network_port->mac[0],
+            network_port->mac[1],
+            network_port->mac[2],
+            network_port->mac[3],
+            network_port->mac[4],
+            network_port->mac[5] );
     fflush(stdout);
 
     {
@@ -52,7 +80,7 @@ static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const cha
         if( context )
         {
             int status=-1;
-            status = uv_rawpkt_init(uv_default_loop(),&context->rawpkt);
+            status = uv_rawpkt_init(iter->loop,&context->rawpkt);
             context->rawpkt.data = (void *)context;
 
             if( status>=0 )
@@ -60,12 +88,12 @@ static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const cha
                 uint16_t ethertype=0x0800;
                 status = uv_rawpkt_open(
                             &context->rawpkt,
-                            name,
+                            network_port,
                             65536,
                             0,
                             10,
                             &ethertype,
-                            mac
+                            rawpkt_closed
                             );
             }
 
@@ -100,15 +128,26 @@ static void found_interface( uv_rawpkt_iter_t *iter, const char *name, const cha
     }
 }
 
-static void removed_interface( uv_rawpkt_iter_t *iter, const char *name, const char *description, const uint8_t *mac )
+static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
+                               uv_rawpkt_network_port_t *port_info )
 {
     port_context_t *cur = portcontext_first;
-    printf( "Removed: %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n", name, description, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5] );
+
+    printf( "Removed: %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n",
+            port_info->device_name,
+            port_info->device_description,
+            port_info->mac[0],
+            port_info->mac[1],
+            port_info->mac[2],
+            port_info->mac[3],
+            port_info->mac[4],
+            port_info->mac[5] );
     fflush(stdout);
 
     while( cur )
     {
-        if( memcmp( cur->rawpkt.mac, mac, 6 )==0 )
+        if( memcmp( cur->rawpkt.owner_network_port->mac,
+                    port_info->mac, 6 )==0 )
         {
             if( cur->prev )
             {
@@ -127,7 +166,7 @@ static void removed_interface( uv_rawpkt_iter_t *iter, const char *name, const c
                 portcontext_last = cur->prev;
             }
 
-            uv_rawpkt_close(&cur->rawpkt,0);
+            uv_rawpkt_close(&cur->rawpkt);
             break;
         }
         cur = cur->next;
@@ -137,10 +176,11 @@ static void removed_interface( uv_rawpkt_iter_t *iter, const char *name, const c
 int main()
 {
     uv_loop_t *loop = uv_default_loop();
-    uv_rawpkt_iter_t rawpkt_iter;
-    uv_rawpkt_iter_init(loop,&rawpkt_iter);
-    uv_rawpkt_iter_start( &rawpkt_iter,
-                          found_interface,
-                          removed_interface);
+    uv_rawpkt_network_port_iterator_t rawpkt_iter;
+    uv_rawpkt_network_port_iterator_init(loop,&rawpkt_iter);
+    uv_rawpkt_network_port_iterator_start(
+                &rawpkt_iter,
+                found_interface,
+                removed_interface);
     uv_run( loop, UV_RUN_DEFAULT );
 }
