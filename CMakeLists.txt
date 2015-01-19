@@ -23,11 +23,6 @@ elseif( ${CMAKE_SYSTEM_NAME} MATCHES "Linux" )
    set( LIBS ${LIBS} pcap m rt )
 endif()
 
-IF (APPLE)
-    FIND_LIBRARY(COREFOUNDATION_LIBRARY CoreFoundation )
-    set(LIBS ${LIBS} ${COREFOUNDATION_LIBRARY})
-ENDIF (APPLE)
-
 
 INCLUDE (common.cmake)
 
