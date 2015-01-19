@@ -47,7 +47,7 @@ static void received_packet( uv_rawpkt_t *rawpkt,
 
     for( bufnum=0; bufnum<nread; ++bufnum )
     {
-        int i;
+        size_t i;
         uint8_t *p = (uint8_t *)buf[bufnum].base;
 
         for( i=0; i<buf[bufnum].len; ++i )

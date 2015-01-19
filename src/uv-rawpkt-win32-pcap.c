@@ -4,12 +4,13 @@
 #if defined(_WIN32)
 
 #include <iphlpapi.h>
-#include <ws2_32.h>
+#include <winsock2.h>
 #include <pcap.h>
 
-#  pragma comment(lib, "IPHLPAPI.lib")
-#  pragma comment(lib, "wpcap.lib" )
-#  pragma comment(lib, "ws2_32.lib" )
+#pragma comment(lib, "IPHLPAPI.lib")
+#pragma comment(lib, "wpcap.lib" )
+#pragma comment(lib, "ws2_32.lib" )
+#pragma comment(lib, "psapi.lib" )
 
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
@@ -44,8 +45,6 @@ void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
     {
         if( events & UV_READABLE )
         {
-            struct pcap_pkthdr pkthdr;
-
             while( pcap_dispatch(
                        pcap,
                        1,
@@ -86,7 +85,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    uint16_t *ethertype,
                    uv_close_cb close_cb)
 {
-    char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcap = 0;
     char filter[1024]="";
     int status=-1;
@@ -94,7 +92,7 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
     if( ethertype )
     {
-        sprintf ( filter, "ether proto 0x%04x", *ethertype );
+        sprintf_s( filter, sizeof(filter), "ether proto 0x%04x", (int)*ethertype );
     }
     rawpkt->owner_network_port = network_port;
 
@@ -165,9 +163,8 @@ int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
     alladdrs = pcap_if->addresses;
     for ( a = alladdrs; a != NULL; a = a->next )
     {
-        if ( a->addr->sa_family == AF_LINK )
+        if ( a->addr->sa_family )
         {
-            uint8_t const *macpos;
             /* TODO: read MAC address from port on WIN32 */
             break;
         }

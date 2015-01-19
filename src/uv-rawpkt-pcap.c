@@ -1,5 +1,17 @@
 #include "uv.h"
-#include "uv-rawpkt.h"
+#include "uv-rawpkt-common.h"
+#include "uv-rawpkt-pcap.h"
+
+#if defined(__APPLE__)
+#include "uv-rawpkt-macosx-pcap.h"
+#elif defined(_WIN32)
+#include "uv-rawpkt-win32-pcap.h"
+#elif defined(__linux__)
+#include "uv-rawpkt-linux.h"
+#else
+#error uv-rawpkt platform not supported
+#endif
+
 
 #if UV_RAWPKT_ENABLE_PCAP
 
@@ -8,7 +20,7 @@
 int uv_rawpkt_network_port_iterator_init(uv_loop_t* loop,
                                          uv_rawpkt_network_port_iterator_t* iter)
 {
-    bzero(iter,sizeof(*iter));
+    memset(iter,0,sizeof(*iter));
     iter->loop = loop;
     return uv_timer_init(loop,&iter->scan_timer);
 }
@@ -63,7 +75,7 @@ void uv_rawpkt_network_port_iterator_close(uv_rawpkt_network_port_iterator_t* it
 
 int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
 {
-    bzero(rawpkt,sizeof(uv_rawpkt_t));
+    memset(rawpkt,0,sizeof(uv_rawpkt_t));
     rawpkt->loop = loop;
     return 0;
 }
@@ -83,7 +95,6 @@ int uv__rawpkt_pcap_open(
     char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcap=0;
     struct bpf_program fcode;
-    int dl;
 
     pcap = pcap_create(network_port->device_name,errbuf);
 

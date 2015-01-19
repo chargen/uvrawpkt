@@ -2,6 +2,7 @@
 #define UV_RAWPKT_WIN32_PCAP_H
 
 #include "uv-rawpkt-common.h"
+#include "uv-rawpkt-pcap.h"
 
 #if defined(_WIN32)
 
