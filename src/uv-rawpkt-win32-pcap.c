@@ -17,7 +17,9 @@ static void CALLBACK uv__rawpkt_win32_event(void *data, BOOLEAN didTimeout )
 {
     uv_async_t *async = (uv_async_t*)data;
     (void)didTimeout;
+
     uv_async_send(async);
+    //uv__rawpkt_readable(async);
 }
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
@@ -118,31 +120,31 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
     {
         pcap =(pcap_t *)rawpkt->pcap;
 
-
         if( status>=0 )
         {
-            if( RegisterWaitForSingleObject(
-                        &rawpkt->wait,
-                        pcap_getevent(pcap),
-                        uv__rawpkt_win32_event,
-                        &rawpkt->handle,
-                        INFINITE,
-                        WT_EXECUTEINWAITTHREAD
-                        ) != 0 )
-            {
-                uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
+            status = uv_async_init(rawpkt->loop,
+                                   &rawpkt->handle,
+                                   uv__rawpkt_readable);
+            rawpkt->handle.data = (void*)rawpkt;
 
-                status = uv_async_init(rawpkt->loop,
-                                       &rawpkt->handle,
-                                       uv__rawpkt_readable);
-                if( status<0 )
+            if( status >=0 )
+            {
+                if( RegisterWaitForSingleObject(
+                            &rawpkt->wait,
+                            pcap_getevent(pcap),
+                            uv__rawpkt_win32_event,
+                            &rawpkt->handle,
+                            INFINITE,
+                            WT_EXECUTEINWAITTHREAD
+                            ) != 0 )
+                {
+                    uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
+                }
+                else
                 {
                     UnregisterWait(rawpkt->wait);
+                    status=-1;
                 }
-            }
-            else
-            {
-                status=-1;
             }
         }
 

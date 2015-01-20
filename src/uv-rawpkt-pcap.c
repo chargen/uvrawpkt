@@ -112,6 +112,10 @@ int uv__rawpkt_pcap_open(
         }
         if( status >=0 )
         {
+            pcap_setnonblock(pcap,1,errbuf);
+        }
+        if( status >=0 )
+        {
             status = pcap_set_timeout(pcap, to_ms);
         }
         if( status >=0 )
