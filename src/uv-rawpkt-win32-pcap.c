@@ -6,12 +6,19 @@
 #include <iphlpapi.h>
 #include <winsock2.h>
 #include <pcap.h>
+#include <Win32-Extensions.h>
 
 #pragma comment(lib, "IPHLPAPI.lib")
 #pragma comment(lib, "wpcap.lib" )
 #pragma comment(lib, "ws2_32.lib" )
 #pragma comment(lib, "psapi.lib" )
 
+static void CALLBACK uv__rawpkt_win32_event(void *data, BOOLEAN didTimeout )
+{
+    uv_async_t *async = (uv_async_t*)data;
+    (void)didTimeout;
+    uv_async_send(async);
+}
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
@@ -36,22 +43,24 @@ void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
     }
 }
 
-void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
+void uv__rawpkt_readable(uv_async_t* handle )
 {
-    uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
-    pcap_t *pcap = (pcap_t *)rawpkt->pcap;
-
-    if( status==0 )
+    if( handle )
     {
-        if( events & UV_READABLE )
+        uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle->data;
+        if( rawpkt )
         {
-            while( pcap_dispatch(
-                       pcap,
-                       1,
-                       uv__rawpkt_readable_pcap_handler,
-                       (u_char *)rawpkt) > 0 )
+            pcap_t *pcap = (pcap_t *)rawpkt->pcap;
+            if( pcap )
             {
-                ;
+                while( pcap_dispatch(
+                           pcap,
+                           1,
+                           uv__rawpkt_readable_pcap_handler,
+                           (u_char *)rawpkt) > 0 )
+                {
+                    ;
+                }
             }
         }
     }
@@ -109,30 +118,38 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
     {
         pcap =(pcap_t *)rawpkt->pcap;
 
-        uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
-        /* TODO: use Win32 mechanism for async message from libpcap
-         * instead of selectable fd which is not available
-         */
-#if 0
-        int fd = pcap_get_selectable_fd(pcap);
 
-        if( uv_poll_init_socket(
-                    rawpkt->loop,&rawpkt->handle,
-                    fd)==0 )
+        if( status>=0 )
         {
-            rawpkt->handle.data = (void *)rawpkt;
-
-            uv_poll_start(
+            if( RegisterWaitForSingleObject(
+                        &rawpkt->wait,
+                        pcap_getevent(pcap),
+                        uv__rawpkt_win32_event,
                         &rawpkt->handle,
-                        UV_READABLE,
-                        uv__rawpkt_readable);
-            return 0;
+                        INFINITE,
+                        WT_EXECUTEINWAITTHREAD
+                        ) != 0 )
+            {
+                uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
+
+                status = uv_async_init(rawpkt->loop,
+                                       &rawpkt->handle,
+                                       uv__rawpkt_readable);
+                if( status<0 )
+                {
+                    UnregisterWait(rawpkt->wait);
+                }
+            }
+            else
+            {
+                status=-1;
+            }
         }
-        else
+
+        if( status<0 )
         {
-            return -1;
+            pcap_close(pcap);
         }
-#endif
     }
 
     return status;
@@ -141,7 +158,7 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
-    uv_poll_stop(&rawpkt->handle);
+    UnregisterWait(rawpkt->wait);
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {
@@ -158,15 +175,32 @@ int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
                                    uint8_t *mac )
 {
     int r=-1;
-    pcap_addr_t *alladdrs;
-    pcap_addr_t *a;
-    alladdrs = pcap_if->addresses;
-    for ( a = alladdrs; a != NULL; a = a->next )
+    PIP_ADAPTER_INFO info = NULL, ninfo;
+    ULONG ulOutBufLen = 0;
+    DWORD dwRetVal = 0;
+    if ( GetAdaptersInfo( info, &ulOutBufLen ) == ERROR_BUFFER_OVERFLOW )
     {
-        if ( a->addr->sa_family )
+        info = (PIP_ADAPTER_INFO)malloc( ulOutBufLen );
+        if ( info != NULL )
         {
-            /* TODO: read MAC address from port on WIN32 */
-            break;
+            if ( ( dwRetVal = GetAdaptersInfo( info, &ulOutBufLen ) ) == NO_ERROR )
+            {
+                ninfo = info;
+                while ( ninfo != NULL )
+                {
+                    if ( strstr( pcap_if->name, ninfo->AdapterName ) > 0 )
+                    {
+                        if ( ninfo->AddressLength == 6 )
+                        {
+                            memcpy( mac, ninfo->Address, 6 );
+                            r=0;
+                            break;
+                        }
+                    }
+                    ninfo = ninfo->Next;
+                }
+            }
+            free( info );
         }
     }
     return r;

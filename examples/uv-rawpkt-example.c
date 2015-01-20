@@ -90,7 +90,7 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
                             &context->rawpkt,
                             network_port,
                             65536,
-                            0,
+                            1,
                             10,
                             &ethertype,
                             rawpkt_closed

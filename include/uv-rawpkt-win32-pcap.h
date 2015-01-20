@@ -19,7 +19,8 @@ extern "C" {
  */
 struct uv_rawpkt_s
 {
-    uv_poll_t handle;
+    uv_async_t handle;
+    HANDLE wait;
     struct pcap *pcap;
     void *data;
     uv_loop_t *loop;
@@ -122,10 +123,8 @@ void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle);
 /**
  * @brief uv__rawpkt_readable
  * @param handle
- * @param status
- * @param events
  */
-void uv__rawpkt_readable(uv_poll_t* handle, int status, int events);
+void uv__rawpkt_readable(uv_async_t* handle );
 
 /**
  * @brief uv__rawpkt_iter_pcap_read_mac
