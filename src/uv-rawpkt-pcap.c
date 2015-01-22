@@ -126,10 +126,6 @@ int uv__rawpkt_pcap_open(
         {
             pcap_setdirection(pcap,PCAP_D_IN);
         }
-        if( status >=0 )
-        {
-            pcap_setmintocopy(pcap,64);
-        }
         if( status>=0 )
         {
             status = pcap_activate(pcap);
