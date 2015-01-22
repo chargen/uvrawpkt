@@ -34,6 +34,7 @@ uv_rawpkt_network_port_t *uv__rawpkt_iter_add_network_port(
         node->device_description = strdup(device_description);
         node->device_name = strdup(device_name);
         memcpy( node->mac, mac, 6 );
+        node->owner = iter;
         node->seen=1;
         if( iter->first==0 )
         {

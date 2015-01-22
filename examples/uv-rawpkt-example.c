@@ -89,9 +89,9 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
                 status = uv_rawpkt_open(
                             &context->rawpkt,
                             network_port,
-                            65536,
+                            128,
                             1,
-                            10,
+                            1,
                             &ethertype,
                             rawpkt_closed
                             );

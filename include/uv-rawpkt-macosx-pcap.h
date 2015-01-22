@@ -58,6 +58,7 @@ struct uv_rawpkt_network_port_s
     uint8_t mac[6];
     struct uv_rawpkt_s *first_rawpkt;
     struct uv_rawpkt_s *last_rawpkt;
+    struct uv_rawpkt_network_port_iterator_s *owner;
 };
 
 /**

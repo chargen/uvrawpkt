@@ -16,10 +16,27 @@
 static void CALLBACK uv__rawpkt_win32_event(void *data, BOOLEAN didTimeout )
 {
     uv_async_t *async = (uv_async_t*)data;
+    uv_rawpkt_t *rawpkt = (uv_rawpkt_t*)data;
+    uv_rawpkt_network_port_t *network_port=rawpkt->owner_network_port;
+    uv_rawpkt_network_port_iterator_t *network_port_iterator = network_port->owner;
     (void)didTimeout;
 
-    uv_async_send(async);
-    //uv__rawpkt_readable(async);
+    /* go through all rawpkt handles for all network ports and notify them to try
+     * read and dispatch packets
+     */
+    network_port = network_port_iterator->first;
+    while( network_port )
+    {
+        rawpkt=network_port->first_rawpkt;
+
+        while( rawpkt )
+        {
+            uv_async_send(&rawpkt->handle);
+            rawpkt=rawpkt->next;
+        }
+
+        network_port = network_port->next;
+    }
 }
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
