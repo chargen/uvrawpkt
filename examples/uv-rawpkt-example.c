@@ -2,59 +2,159 @@
 #include "uv-rawpkt.h"
 #include <stdio.h>
 
+/**
+ * @brief found_interface
+ *
+ * Called whenever an ethernet capable network port interface is
+ * found
+ *
+ * @param iter the network port iterator that owns this network port
+ * @param port_info the network port
+ */
 static void found_interface(
         uv_rawpkt_network_port_iterator_t *iter,
         uv_rawpkt_network_port_t *port_info );
 
+/**
+ * @brief removed_interface
+ *
+ * Called whenever an ethernet capable network port interface
+ * was removed
+ *
+ * @param iter the network port iterator that owns this network port
+ * @param port_info the network port
+ */
 static void removed_interface(
         uv_rawpkt_network_port_iterator_t *iter,
         uv_rawpkt_network_port_t *port_info );
 
+/**
+ * @brief The port_context_s struct
+ *
+ * Local structure to keep track of a linked list of uv_rawpkt_t objects
+ * for one protocol type and any additional protocol state required for them.
+ *
+ * These are kept in a doubly linked list so that the collection
+ * of protocol handlers can forward messages between network ports if
+ * necessary
+ */
 struct port_context_s
 {
+    uv_rawpkt_t rawpkt;
+    int frame_received_count;
     struct port_context_s *next;
     struct port_context_s *prev;
-    uv_rawpkt_t rawpkt;
 };
 typedef struct port_context_s port_context_t;
 
+/**
+ * @brief portcontext_first The first entry of the port_context_t object list
+ */
 port_context_t *portcontext_first = 0;
+
+/**
+ * @brief portcontext_last The last entry of the port_context_t object list
+ */
 port_context_t *portcontext_last = 0;
 
-static void received_packet( uv_rawpkt_t *rawpkt,
-                             ssize_t nread,
-                             const uv_buf_t *buf );
+/**
+ * @brief received_packet callback for any received ethernet frames
+ *
+ * @param rawpkt The uv_rawpkt_t object that received the ethernet frames
+ * @param nread The number of ethernet frames received
+ * @param buf The list of nread uv_buf_t's containing the ethernet frames
+ */
+static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
+                                     ssize_t nread,
+                                     const uv_buf_t *buf );
 
+/**
+ * @brief rawpkt_closed callback that is called whenever a uv_rawpkt is closed
+ *
+ * @param handle The pointer to the uv_rawpkt_t as a uv_handle_t
+ */
 static void rawpkt_closed( uv_handle_t *handle );
+
+/**
+ * @brief finish called by a signal handler when SIGINT occurs
+ *
+ *
+ * @param handle The sigint_t handler
+ * @param sig The signal number
+ */
+static void finish( uv_signal_t *handle, int sig );
 
 
 static void rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
+    port_context_t *context = (port_context_t *)rawpkt->data;
 
-    printf( "Closed : %s\n", rawpkt->owner_network_port->device_name );
+    printf( "Closed : %s after receiving %d frames\n",
+            rawpkt->owner_network_port->device_name,
+            context->frame_received_count );
+    fflush(stdout);
+    /*
+     * Remove the associated port context
+     */
+    if( context->prev )
+    {
+        context->prev->next = context->next;
+    }
+    if( context->next )
+    {
+        context->next->prev = context->prev;
+    }
+    if( portcontext_first == context )
+    {
+        portcontext_first = context->next;
+    }
+    if( portcontext_last == context )
+    {
+        portcontext_last = context->prev;
+    }
+    free(context);
 }
 
-static void received_packet( uv_rawpkt_t *rawpkt,
+static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
                              ssize_t nread,
                              const uv_buf_t *buf )
 {
     int bufnum=0;
     port_context_t *context = (port_context_t *)rawpkt->data;
     const uint8_t *mac = rawpkt->owner_network_port->mac;
-    printf("From: %02X:%02X:%02X:%02X:%02X:%02X :",
-           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 
-    for( bufnum=0; bufnum<nread; ++bufnum )
+    /*
+     * Count and print all network packets for this protocol handler
+     */
+
+    if( nread>0 )
     {
-        size_t i;
-        uint8_t *p = (uint8_t *)buf[bufnum].base;
+        context->frame_received_count++;
 
-        for( i=0; i<buf[bufnum].len; ++i )
+        printf("\nFrame #%8d On: %02X:%02X:%02X:%02X:%02X:%02X :",
+               context->frame_received_count,
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+        for( bufnum=0; bufnum<nread; ++bufnum )
         {
-            printf("%02X ",(uint16_t)p[i]);
+            size_t i;
+            uint8_t *p = (uint8_t *)buf[bufnum].base;
+
+            for( i=0; i<buf[bufnum].len; ++i )
+            {
+                printf("%02X ",(uint16_t)p[i]);
+            }
+            printf( "\n" );
         }
-        printf( "\n" );
+    }
+    else
+    {
+        /*
+         * Notify user that the socket was closed
+         */
+        printf("\nEnd of connection on: %02X:%02X:%02X:%02X:%02X:%02X :",
+               mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
     }
     fflush(stdout);
 }
@@ -64,6 +164,9 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
 {
     port_context_t *context=0;
 
+    /**
+     * Tell the user that a new network port was found
+     */
     printf( "Found  : %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n",
             network_port->device_name,
             network_port->device_description,
@@ -76,15 +179,32 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
     fflush(stdout);
 
     {
+        /*
+         * Allocate a new port_context_t
+         */
         context=calloc(sizeof(port_context_t),1);
         if( context )
         {
             int status=-1;
+
+            /*
+             * Initialize the new uv_rawpkt_t object, attached
+             * to the same loop as the iterator used
+             */
             status = uv_rawpkt_init(iter->loop,&context->rawpkt);
+
+            /*
+             * Point the rawpkt.data pointer to the port_context object
+             */
+
             context->rawpkt.data = (void *)context;
 
             if( status>=0 )
             {
+                /*
+                 * Open the uv_rawpkt_t object to listen on this
+                 * network port for any IPv4 Ethertype messages
+                 */
                 uint16_t ethertype=0x0800;
                 status = uv_rawpkt_open(
                             &context->rawpkt,
@@ -99,13 +219,20 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
 
             if( status>=0 )
             {
+                /*
+                 * Start receiving ethernet frames, using the
+                 * received_ethernet_frame callback
+                 */
                 uv_rawpkt_recv_start(
                             &context->rawpkt,
-                            received_packet );
+                            received_ethernet_frame );
             }
 
             if( status>=0 )
             {
+                /*
+                 * Add this new port context object to the linked list
+                 */
                 if( portcontext_first == 0 )
                 {
                     portcontext_first=context;
@@ -133,6 +260,9 @@ static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
 {
     port_context_t *cur = portcontext_first;
 
+    /**
+     * Tell the user that a new network port was removed
+     */
     printf( "Removed: %s: %s %02X:%02X:%02X:%02X:%02X:%02X\n",
             port_info->device_name,
             port_info->device_description,
@@ -144,42 +274,30 @@ static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
             port_info->mac[5] );
     fflush(stdout);
 
-    while( cur )
-    {
-        if( memcmp( cur->rawpkt.owner_network_port->mac,
-                    port_info->mac, 6 )==0 )
-        {
-            if( cur->prev )
-            {
-                cur->prev->next = cur->next;
-            }
-            if( cur->next )
-            {
-                cur->next->prev = cur->prev;
-            }
-            if( portcontext_first == cur )
-            {
-                portcontext_first = cur->next;
-            }
-            if( portcontext_last == cur )
-            {
-                portcontext_last = cur->prev;
-            }
 
-            uv_rawpkt_close(&cur->rawpkt);
-            break;
-        }
-        cur = cur->next;
-    }
 }
 
 void finish( uv_signal_t *handle, int sig )
 {
     uv_rawpkt_network_port_iterator_t *network_port_iterator =
             (uv_rawpkt_network_port_iterator_t *)handle->data;
+    /*
+     * Stop listening for the signal
+     */
     uv_signal_stop(handle);
+
+    /*
+     * Stop the network port iterator
+     */
     uv_rawpkt_network_port_iterator_stop( network_port_iterator );
+
+    /*
+     * Close the network port iterator and all owned network_ports
+     * and all of the futher owned uv_rawpkt_t objects
+     */
     uv_rawpkt_network_port_iterator_close( network_port_iterator, 0 );
+
+    uv_stop(network_port_iterator->loop);
 }
 
 int main()
