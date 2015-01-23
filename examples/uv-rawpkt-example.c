@@ -258,8 +258,6 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
 static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
                                uv_rawpkt_network_port_t *port_info )
 {
-    port_context_t *cur = portcontext_first;
-
     /**
      * Tell the user that a new network port was removed
      */

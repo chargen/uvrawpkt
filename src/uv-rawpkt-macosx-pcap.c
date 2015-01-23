@@ -38,8 +38,6 @@ void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
     {
         if( events & UV_READABLE )
         {
-            struct pcap_pkthdr pkthdr;
-
             while( pcap_dispatch(
                        pcap,
                        1,
@@ -80,7 +78,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    uint16_t *ethertype,
                    uv_close_cb close_cb)
 {
-    char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcap = 0;
     char filter[1024]="";
     int status=-1;

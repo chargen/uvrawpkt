@@ -228,7 +228,6 @@ void uv__rawpkt_iter_timer(uv_timer_t* handle)
 int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
                      uint8_t *mac)
 {
-    pcap_t *pcap = (pcap_t *)rawpkt->pcap;
     memcpy( mac, rawpkt->owner_network_port->mac, 6 );
     return 0;
 }
