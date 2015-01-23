@@ -295,7 +295,6 @@ void finish( uv_signal_t *handle, int sig )
      */
     uv_rawpkt_network_port_iterator_close( network_port_iterator, 0 );
 
-    uv_stop(network_port_iterator->loop);
 }
 
 int main()

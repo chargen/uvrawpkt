@@ -129,7 +129,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
-    uv_poll_stop(&rawpkt->handle);
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {
