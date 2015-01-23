@@ -131,7 +131,7 @@ static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
     if( nread>0 )
     {
         context->frame_received_count++;
-
+#if 0
         printf("\nFrame #%8d On: %02X:%02X:%02X:%02X:%02X:%02X :",
                context->frame_received_count,
                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
@@ -147,6 +147,7 @@ static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
             }
             printf( "\n" );
         }
+#endif
     }
     else
     {

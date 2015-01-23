@@ -84,6 +84,7 @@ uv_rawpkt_network_port_t * uv__rawpkt_iter_find_network_port(
         uv_rawpkt_network_port_iterator_t* iter,
         const char *device_name);
 
+void uv__rwpkt_network_port_closed( uv_handle_t *handle );
 
 #ifdef __cplusplus
 }

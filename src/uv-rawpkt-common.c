@@ -76,6 +76,7 @@ void uv__rawpkt_iter_free_network_port(
 
         free(node->device_description);
         free(node->device_name);
+        free(node);
     }
 }
 

@@ -213,9 +213,24 @@ void uv__rawpkt_iter_timer(uv_timer_t* handle)
         if( node->seen==0 )
         {
             uv_rawpkt_network_port_t *next = node->next;
-
-            self->removed_cb( self, node );
-            uv__rawpkt_iter_free_network_port( self, node );
+            uv_rawpkt_t *rawpkt = node->first_rawpkt;
+            
+            if( rawpkt )
+            {
+                /* If the node has any rawpkt objects, close them */
+                while( rawpkt )
+                {
+                    uv_rawpkt_t *rawpkt_next = rawpkt->next;
+                    uv_rawpkt_close(rawpkt);
+                    rawpkt = rawpkt_next;
+                }
+            }
+            else
+            {
+                /* If the node does not have any rawpkt objects, free the node */
+                
+                uv_close( (uv_handle_t *)&node->link_status_timer, uv__rwpkt_network_port_closed );
+            }
             node = next;
         }
         else
@@ -224,6 +239,16 @@ void uv__rawpkt_iter_timer(uv_timer_t* handle)
         }
     }
 }
+
+void uv__rwpkt_network_port_closed( uv_handle_t *handle )
+{
+    uv_rawpkt_network_port_t *node = (uv_rawpkt_network_port_t *)handle->data;
+    uv_rawpkt_network_port_iterator_t *self = node->owner;
+
+    self->removed_cb( self, node );
+    uv__rawpkt_iter_free_network_port( self, node );
+}
+
 
 int uv_rawpkt_getmac(uv_rawpkt_t* rawpkt,
                      uint8_t *mac)
