@@ -31,15 +31,43 @@ extern "C" {
 # define UVRAWPKT_EXTERN /* nothing */
 #endif
 
-
+/** uv_rawpkt_t structure
+ *
+ * Keeps track of one raw packet socket.  Typically restricted
+ * to a single network port with a single ethertype.
+ *
+ */
 struct uv_rawpkt_s;
-struct uv_rawpkt_send_s;
-struct uv_rawpkt_network_port_s;
-struct uv_rawpkt_network_port_iterator_s;
-
 typedef struct uv_rawpkt_s uv_rawpkt_t;
+
+/** uv_rawpkt_send_s structure
+ *
+ * Keeps track of a single request to send one or more
+ * ethernet packets through a uv_rawpkt_s object.
+ */
+struct uv_rawpkt_send_s;
 typedef struct uv_rawpkt_send_s uv_rawpkt_send_t;
+
+/** uv_rawpkt_network_port_s structure
+ *
+ * Represents a single ethernet capable network port.
+ * A uv_rawpkt_network_port_s object is created only
+ * by the uv_rawpkt_network_port_iterator.
+ *
+ * Owns all uv_rawpkt_s objects that are created.
+ */
+struct uv_rawpkt_network_port_s;
 typedef struct uv_rawpkt_network_port_s uv_rawpkt_network_port_t;
+
+/** uv_rawpkt_network_port_iterator_s structure
+ *
+ * Manages the discovery of attached and removed ethernet
+ * capable network ports.  Creates uv_rawpkt_network_port_s
+ * objects and notifies a callback on port discovered and
+ * port removed events.  Owns all uv_rawpkt_network_port_s
+ * objects that are discovered.
+ */
+struct uv_rawpkt_network_port_iterator_s;
 typedef struct uv_rawpkt_network_port_iterator_s uv_rawpkt_network_port_iterator_t;
 
 /**
