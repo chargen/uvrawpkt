@@ -39,8 +39,6 @@ void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
     {
         if( events & UV_READABLE )
         {
-            struct pcap_pkthdr pkthdr;
-
             while( pcap_dispatch(
                        pcap,
                        1,
@@ -81,7 +79,6 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                    uint16_t *ethertype,
                    uv_close_cb close_cb)
 {
-    char errbuf[PCAP_ERRBUF_SIZE];
     pcap_t *pcap = 0;
     char filter[1024]="";
     int status=-1;
@@ -133,12 +130,17 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
-    uv_poll_stop(&rawpkt->handle);
+    if( rawpkt->pcap )
+    {
+        pcap_close( rawpkt->pcap );
+    }
+    
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {
         rawpkt->close_cb( (uv_handle_t *)rawpkt );
     }
+    free(rawpkt);
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt)
