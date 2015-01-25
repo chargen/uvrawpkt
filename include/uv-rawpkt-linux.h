@@ -1,3 +1,6 @@
+#ifndef UV_RAWPKT_LINUX_H
+#define UV_RAWPKT_LINUX_H
+
 /*
   Copyright (c) 2015, J.D. Koftinoff Software, Ltd.
   All rights reserved.
@@ -29,8 +32,26 @@
   POSSIBILITY OF SUCH DAMAGE.
 */
 
-#include "uv.h"
-#include "uv-rawpkt.h"
+#include "uv-rawpkt-common.h"
 
-const char *uv_rawpkt_file = __FILE__;
+#if UV_RAWPKT_ENABLE_PCAP==0
+
+#if defined(__linux__)
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+
+#ifdef __cplusplus
+}
+#endif
+
+
+#endif
+
+
+#endif
+#endif
 
