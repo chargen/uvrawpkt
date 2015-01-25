@@ -44,30 +44,14 @@
 #pragma comment(lib, "ws2_32.lib" )
 #pragma comment(lib, "psapi.lib" )
 
-static void CALLBACK uv__rawpkt_win32_event(void *data, BOOLEAN didTimeout )
+static void CALLBACK uv__rawpkt_win32_thread(void *data)
 {
-    uv_async_t *async = (uv_async_t*)data;
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t*)data;
     uv_rawpkt_network_port_t *network_port=rawpkt->owner_network_port;
     uv_rawpkt_network_port_iterator_t *network_port_iterator = network_port->owner;
-    (void)didTimeout;
 
-    /* go through all rawpkt handles for all network ports and notify them to try
-     * read and dispatch packets
-     */
-    network_port = network_port_iterator->first;
-    while( network_port )
-    {
-        rawpkt=network_port->first_rawpkt;
+    pcap_next_ex()
 
-        while( rawpkt )
-        {
-            uv_async_send(&rawpkt->handle);
-            rawpkt=rawpkt->next;
-        }
-
-        network_port = network_port->next;
-    }
 }
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
@@ -177,21 +161,13 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
             if( status >=0 )
             {
-                if( RegisterWaitForSingleObject(
-                            &rawpkt->wait,
-                            pcap_getevent(pcap),
-                            uv__rawpkt_win32_event,
-                            &rawpkt->handle,
-                            INFINITE,
-                            WT_EXECUTEINWAITTHREAD
-                            ) != 0 )
+                uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
+
+                status = uv_thread_create( &rawpkt->pcap_thread, uv__rawpkt_win32_thread, (void *)rawpkt );
+
+                if( status<0 )
                 {
-                    uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
-                }
-                else
-                {
-                    UnregisterWait(rawpkt->wait);
-                    status=-1;
+                    uv__rawpkt_network_port_remove_rawpkt(network_port,rawpkt);
                 }
             }
         }

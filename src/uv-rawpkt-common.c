@@ -62,9 +62,13 @@ uv_rawpkt_network_port_t *uv__rawpkt_iter_add_network_port(
                     uv__rawpkt_network_port_link_status_timer,
                     0,
                     1000);
-
+#if defined(_WIN32)
+        node->device_description = _strdup(device_description);
+        node->device_name = _strdup(device_name);
+#else
         node->device_description = strdup(device_description);
         node->device_name = strdup(device_name);
+#endif
         memcpy( node->mac, mac, 6 );
         node->owner = iter;
         node->seen=1;
