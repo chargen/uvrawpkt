@@ -141,6 +141,7 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
                     fd)==0 )
         {
             rawpkt->handle.data = (void *)rawpkt;
+            rawpkt->close_cb = close_cb;
 
             uv_poll_start(
                         &rawpkt->handle,
@@ -170,7 +171,6 @@ void uv_rawpkt_closed( uv_handle_t *handle )
     {
         rawpkt->close_cb( (uv_handle_t *)rawpkt );
     }
-    free(rawpkt);
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt)

@@ -150,6 +150,8 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
             if( status >=0 )
             {
+                rawpkt->close_cb = close_cb;
+
                 uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
 
                 status = uv_timer_start(&rawpkt->recv_timer,uv__rawpkt_read_timer,10,10);
@@ -186,7 +188,6 @@ void uv_rawpkt_closed( uv_handle_t *handle )
     {
         rawpkt->close_cb( (uv_handle_t *)rawpkt );
     }
-    free( rawpkt );
 }
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt)
