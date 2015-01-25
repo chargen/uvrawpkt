@@ -50,9 +50,7 @@ extern "C" {
  */
 struct uv_rawpkt_s
 {
-    uv_async_t handle;
-    uv_thread_t pcap_thread;
-    HANDLE wait;
+    uv_timer_t recv_timer;
     struct pcap *pcap;
     void *data;
     uv_loop_t *loop;
@@ -113,6 +111,24 @@ struct uv_rawpkt_network_port_iterator_s
     struct uv_rawpkt_network_port_s *last;
 };
 
+/**
+ * @brief uv_rawpkt_open
+ * @param rawpkt
+ * @param network_port
+ * @param snaplen
+ * @param promiscuous
+ * @param to_ms
+ * @param ethertype
+ * @param close_cb
+ * @return
+ */
+UVRAWPKT_EXTERN int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
+                                   struct uv_rawpkt_network_port_s *network_port,
+                                   int snaplen,
+                                   int promiscuous,
+                                   int to_ms,
+                                   uint16_t *ethertype,
+                                   uv_close_cb close_cb );
 
 
 /**
@@ -136,10 +152,10 @@ UVRAWPKT_EXTERN void uv_rawpkt_close(uv_rawpkt_t* rawpkt);
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle);
 
 /**
- * @brief uv__rawpkt_readable
+ * @brief uv__rawpkt_read_timer
  * @param handle
  */
-void uv__rawpkt_readable(uv_async_t* handle );
+void uv__rawpkt_read_timer(uv_timer_t* handle );
 
 /**
  * @brief uv__rawpkt_iter_pcap_read_mac

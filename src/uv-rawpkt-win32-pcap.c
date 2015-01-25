@@ -44,15 +44,6 @@
 #pragma comment(lib, "ws2_32.lib" )
 #pragma comment(lib, "psapi.lib" )
 
-static void CALLBACK uv__rawpkt_win32_thread(void *data)
-{
-    uv_rawpkt_t *rawpkt = (uv_rawpkt_t*)data;
-    uv_rawpkt_network_port_t *network_port=rawpkt->owner_network_port;
-    uv_rawpkt_network_port_iterator_t *network_port_iterator = network_port->owner;
-
-    pcap_next_ex()
-
-}
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
@@ -77,7 +68,7 @@ void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
     }
 }
 
-void uv__rawpkt_readable(uv_async_t* handle )
+void uv__rawpkt_read_timer(uv_timer_t* handle )
 {
     if( handle )
     {
@@ -89,7 +80,7 @@ void uv__rawpkt_readable(uv_async_t* handle )
             {
                 while( pcap_dispatch(
                            pcap,
-                           1,
+                           -1,
                            uv__rawpkt_readable_pcap_handler,
                            (u_char *)rawpkt) > 0 )
                 {
@@ -154,16 +145,14 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 
         if( status>=0 )
         {
-            status = uv_async_init(rawpkt->loop,
-                                   &rawpkt->handle,
-                                   uv__rawpkt_readable);
-            rawpkt->handle.data = (void*)rawpkt;
+            status = uv_timer_init(rawpkt->loop,&rawpkt->recv_timer);
+            rawpkt->recv_timer.data = (void*)rawpkt;
 
             if( status >=0 )
             {
                 uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
 
-                status = uv_thread_create( &rawpkt->pcap_thread, uv__rawpkt_win32_thread, (void *)rawpkt );
+                status = uv_timer_start(&rawpkt->recv_timer,uv__rawpkt_read_timer,10,10);
 
                 if( status<0 )
                 {
@@ -184,12 +173,14 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 void uv_rawpkt_closed( uv_handle_t *handle )
 {
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
+
+    uv_timer_stop(&rawpkt->recv_timer);
+
     if( rawpkt->pcap )
     {
         pcap_close( rawpkt->pcap );
     }
 
-    UnregisterWait(rawpkt->wait);
     uv__rawpkt_network_port_remove_rawpkt(rawpkt->owner_network_port,rawpkt);
     if( rawpkt->close_cb )
     {
@@ -200,7 +191,7 @@ void uv_rawpkt_closed( uv_handle_t *handle )
 
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt)
 {
-    uv_close( (uv_handle_t *)&rawpkt->handle, uv_rawpkt_closed );
+    uv_close( (uv_handle_t *)&rawpkt->recv_timer, uv_rawpkt_closed );
 }
 
 int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
