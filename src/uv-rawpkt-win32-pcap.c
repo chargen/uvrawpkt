@@ -32,7 +32,7 @@
 #include "uv.h"
 #include "uv-rawpkt.h"
 
-#if defined(_WIN32)
+#if defined(_WIN32) && UV_RAWPKT_ENABLE_PCAP==1
 
 #include <iphlpapi.h>
 #include <winsock2.h>

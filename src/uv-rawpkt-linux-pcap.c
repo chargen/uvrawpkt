@@ -210,6 +210,6 @@ int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
 
 
 #else
-const char *uv_rawpkt_linux_file = __FILE__;
+const char *uv_rawpkt_linux_pcap_file = __FILE__;
 #endif
 

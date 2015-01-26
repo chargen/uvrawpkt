@@ -32,7 +32,7 @@
 #include "uv.h"
 #include "uv-rawpkt.h"
 
-#if defined(__APPLE__)
+#if defined(__APPLE__) && UV_RAWPKT_ENABLE_PCAP==1
 #include <net/if_dl.h>
 #include <pcap.h>
 

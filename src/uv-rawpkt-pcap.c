@@ -35,74 +35,9 @@
 
 #include "uv-rawpkt.h"
 
-#if UV_RAWPKT_ENABLE_PCAP
+#if UV_RAWPKT_ENABLE_PCAP==1
 
 #include <pcap.h>
-
-int uv_rawpkt_network_port_iterator_init(uv_loop_t* loop,
-                                         uv_rawpkt_network_port_iterator_t* iter)
-{
-    memset(iter,0,sizeof(*iter));
-    iter->loop = loop;
-    return uv_timer_init(loop,&iter->scan_timer);
-}
-
-int uv_rawpkt_network_port_iterator_start(uv_rawpkt_network_port_iterator_t* iter,
-                                          uv_rawpkt_network_port_iterator_cb found_cb,
-                                          uv_rawpkt_network_port_iterator_cb removed_cb)
-{
-    iter->added_cb = found_cb;
-    iter->removed_cb = removed_cb;
-    iter->scan_timer.data = (void *)iter;
-    return uv_timer_start(&iter->scan_timer,uv__rawpkt_iter_timer,0,1000);
-}
-
-void uv_rawpkt_network_port_iterator_stop(uv_rawpkt_network_port_iterator_t* iter)
-{
-    uv_timer_stop(&iter->scan_timer);
-}
-
-void uv_rawpkt_network_port_iterator_close(uv_rawpkt_network_port_iterator_t* iter,
-                                           uv_close_cb close_cb )
-{
-    uv_rawpkt_network_port_t *port;
-
-    uv_timer_stop(&iter->scan_timer);
-
-    /* iterate through all network ports */
-    port = iter->first;
-    while( port )
-    {
-        uv_rawpkt_t *rawpkt;
-
-        /* iterate through all rawpkt sockets open on this network port */
-        rawpkt = port->first_rawpkt;
-        while( rawpkt )
-        {
-            /* close it */
-            uv_rawpkt_close(rawpkt);
-            rawpkt = rawpkt->next;
-        }
-
-        uv_timer_stop(&port->link_status_timer);
-
-        port = port->next;
-    }
-
-    if( close_cb )
-    {
-        close_cb( (uv_handle_t *)&iter );
-    }
-}
-
-int uv_rawpkt_init(uv_loop_t* loop, uv_rawpkt_t* rawpkt )
-{
-    memset(rawpkt,0,sizeof(uv_rawpkt_t));
-    rawpkt->loop = loop;
-    return 0;
-}
-
-
 
 int uv__rawpkt_pcap_open(
         uv_rawpkt_t* rawpkt,
@@ -302,31 +237,7 @@ int uv_rawpkt_send(uv_rawpkt_send_t* req,
     return 0;
 }
 
-int uv_rawpkt_recv_start(uv_rawpkt_t* handle,
-                         uv_rawpkt_recv_cb recv_cb)
-{
-    handle->recv_cb = recv_cb;
-    return 0;
-}
 
-int uv_rawpkt_recv_stop(uv_rawpkt_t* handle)
-{
-    handle->recv_cb = 0;
-    return 0;
-}
-
-int uv_rawpkt_link_status_start(uv_rawpkt_t* handle,
-                                uv_rawpkt_link_status_cb link_status_cb)
-{
-    handle->link_status_cb = link_status_cb;
-    return 0;
-}
-
-int uv_rawpkt_link_status_stop(uv_rawpkt_t* handle)
-{
-    handle->link_status_cb = 0;
-    return 0;
-}
 #else
 const char *uv_rawpkt_pcap_file = __FILE__;
 #endif
