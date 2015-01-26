@@ -49,6 +49,8 @@ struct uv_rawpkt_s
 {
     uv_poll_t handle;
     void *data;
+    int fd;
+    uint16_t ethertype;
     uv_loop_t *loop;
     uv_rawpkt_link_status_cb link_status_cb;
     uv_rawpkt_recv_cb recv_cb;
@@ -65,8 +67,9 @@ struct uv_rawpkt_s
  */
 struct uv_rawpkt_send_s
 {
+    uv_req_t req;
     void *data;
-    uv_rawpkt_t* handle;
+    uv_rawpkt_t* rawpkt;
     uv_rawpkt_send_cb cb;
 };
 
@@ -84,6 +87,7 @@ struct uv_rawpkt_network_port_s
     int seen;
     char *device_name;
     char *device_description;
+    int interface_id;
     uint8_t mac[6];
     struct uv_rawpkt_s *first_rawpkt;
     struct uv_rawpkt_s *last_rawpkt;

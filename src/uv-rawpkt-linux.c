@@ -35,9 +35,12 @@
 
 #if defined(__linux__) && UV_RAWPKT_ENABLE_PCAP==0
 
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <sys/ioctl.h>
+#include <linux/sockios.h>
 #include <linux/if_packet.h>
-
-#include <pcap.h>
+#include <linux/if_ether.h>
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
@@ -70,11 +73,15 @@ void uv__rawpkt_readable(uv_poll_t* handle, int status, int events)
     {
         if( events & UV_READABLE )
         {
-            /* TODO */
+            uint8_t buf[1500];
+            size_t buf_len;
+            do
+            {
+                buf_len = recv( rawpkt->fd, buf, sizeof( buf ), 0 );
+            } while ( buf_len < 0 && ( errno == EINTR ) );
         }
     }
 }
-
 
 
 int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
@@ -87,12 +94,29 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
 {
     int fd=-1;
 
-    rawpkt->owner_network_port = network_port;
-
-    /* TODO: Open device */
-
-    if( fd>=0 )
+    /* only support open when ethertype is set */
+    if( ethertype != NULL )
     {
+        rawpkt->ethertype = *ethertype;
+        fd = socket( AF_PACKET, SOCK_RAW, htons( *ethertype ) );
+        rawpkt->fd = fd;
+    }
+
+    /* TODO: Set promiscuous mode if necessary */
+
+    if ( fd >= 0 )
+    {
+        /* set socket to be non-blocking */
+        {
+            int val;
+            int flags;
+            val = fcntl( fd, F_GETFL, 0 );
+            flags = O_NONBLOCK;
+            val |= flags;
+            fcntl( fd, F_SETFL, val );
+        }
+
+        rawpkt->owner_network_port = network_port;
         uv__rawpkt_network_port_add_rawpkt(network_port,rawpkt);
 
         if( uv_poll_init_socket(
@@ -106,16 +130,16 @@ int uv_rawpkt_open(uv_rawpkt_t* rawpkt,
             uv_poll_start(
                         &rawpkt->handle,
                         UV_READABLE,
-                        uv__rawpkt_readable);
-            return 0;
+                        uv__rawpkt_readable);           
         }
         else
         {
-            return -1;
+            close(fd);
+            fd=-1;
         }
     }
 
-    return -1;
+    return fd >= 0 ? 0 : -1;
 }
 
 void uv_rawpkt_closed( uv_handle_t *handle )
@@ -129,42 +153,74 @@ void uv_rawpkt_closed( uv_handle_t *handle )
     }
 }
 
+int uv_rawpkt_send(uv_rawpkt_send_t* req,
+                   uv_rawpkt_t * rawpkt,
+                   const uv_buf_t bufs[],
+                   unsigned int nbufs,
+                   uv_rawpkt_send_cb send_cb )
+{
+    int r = -1;
+    ssize_t sent_len;
+    struct sockaddr_ll socket_address;
+#if 0
+    uint8_t buffer[ETH_FRAME_LEN];
+    unsigned char *etherhead = buffer;
+    unsigned char *data = buffer + 14;
+    struct ethhdr *eh = (struct ethhdr *)etherhead;
+
+    socket_address.sll_family = PF_PACKET;
+    socket_address.sll_protocol = htons( rawpkt->ethertype );
+    socket_address.sll_ifindex = rawpkt->owner_network_port->interface_id;
+    socket_address.sll_hatype = 1; /*ARPHRD_ETHER; */
+    socket_address.sll_pkttype = PACKET_OTHERHOST;
+    socket_address.sll_halen = ETH_ALEN;
+    memcpy( socket_address.sll_addr, rawpkt->owner_network_port->mac, ETH_ALEN );
+    socket_address.sll_addr[6] = 0x00;
+    socket_address.sll_addr[7] = 0x00;
+
+    do
+    {
+        sent_len
+            = sendto(
+                    rawpkt->fd, buffer,
+                    payload_len + 14,
+                    0,
+                    (struct sockaddr *)&socket_address,
+                    sizeof( socket_address ) );
+    } while ( sent_len < 0 && ( errno == EINTR ) );
+#endif
+    if ( sent_len >= 0 )
+    {
+        r=0;
+    }
+
+    if( send_cb )
+    {
+        send_cb(req,r);
+    }
+
+    return r;
+}
+
 void uv_rawpkt_close(uv_rawpkt_t* rawpkt)
 {
     uv_close( (uv_handle_t *)&rawpkt->handle, uv_rawpkt_closed );
 }
 
 
-int uv__rawpkt_iter_pcap_read_mac( pcap_if_t *pcap_if,
-                                   uint8_t *mac )
-{
-    int r=-1;
-    pcap_addr_t *alladdrs;
-    pcap_addr_t *a;
-    alladdrs = pcap_if->addresses;
-    for ( a = alladdrs; a != NULL; a = a->next )
-    {
-        if ( a->addr->sa_family == AF_PACKET )
-        {
-            uint8_t const *macpos;
-            struct sockaddr_ll *ll = (struct sockaddr_ll *)a->addr;
-            macpos = ll->sll_addr;
-
-            memcpy( mac, macpos, 6 );
-            if( mac[0]!=0 || mac[1]!=0 || mac[2]!=0
-                    || mac[3]!=0 || mac[4]!=0 || mac[5]!=0 )
-            {
-                r=0;
-            }
-            break;
-        }
-    }
-    return r;
-}
 
 void uv__rawpkt_iter_timer(uv_timer_t* handle)
 {
-    /* TODO */
+    uv_rawpkt_network_port_iterator_t *iter = (uv_rawpkt_network_port_iterator_t *)handle->data;
+    int i;
+
+    /* TODO scan through all interfaces */
+    /* get MAC adderess for each and get interface_id for each */
+    for ( i = 0; i < 6; ++i )
+    {
+//        self->m_my_mac[i] = (uint8_t)ifr.ifr_hwaddr.sa_data[i];
+    }
+
 }
 
 #else
