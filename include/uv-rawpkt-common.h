@@ -131,9 +131,13 @@ typedef void (*uv_rawpkt_network_port_iterator_cb)(
 
 /**
  * @brief uv_rawpkt_network_port_iterator_init
- * @param loop
- * @param iter
- * @return
+ *
+ * Initialize the uv_rawpkt_port_iterator_t object,
+ * assigning it to the specified uv_loop_t
+ *
+ * @param loop The uv_loop_t to use with the network port iterator
+ * @param iter The iterator to initialize
+ * @return 0 on success, <0 on error
  */
 UVRAWPKT_EXTERN
 int uv_rawpkt_network_port_iterator_init(uv_loop_t* loop,
