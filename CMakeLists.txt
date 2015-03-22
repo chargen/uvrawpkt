@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.8)
 
 IF(BIICODE)
     ADD_BIICODE_TARGETS()
+    TARGET_LINK_LIBRARIES(${BII_BLOCK_TARGET} INTERFACE pcap)
 ELSE(NOT BIICODE)
 
     set(PROJECT "uvrawpkt")
