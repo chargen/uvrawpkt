@@ -118,6 +118,7 @@ uv_rawpkt_network_port_t *uv__rawpkt_iter_add_network_port(
     uv_rawpkt_network_port_t *node = calloc(sizeof(uv_rawpkt_network_port_t),1);
     if( node )
     {
+        node->link_status = -1;
         uv_timer_init(iter->loop,&node->link_status_timer);
         node->link_status_timer.data = (void *)node;
         uv_timer_start(

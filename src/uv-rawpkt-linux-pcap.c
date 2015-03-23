@@ -33,30 +33,52 @@
 #include "uv-rawpkt.h"
 
 #if defined(__linux__) && UV_RAWPKT_ENABLE_PCAP==1
-
+#include <sys/ioctl.h>
+#include <linux/ethtool.h>
+#include <linux/sockios.h>
 #include <linux/if_packet.h>
-
+#include <unistd.h>
 #include <pcap.h>
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
     uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
-    /* TODO: poll link status */
 
-    if( new_status != network_port->link_status )
+    fd = socket( AF_INET, SOCK_DGRAM, 0 );
+    if( fd>=0 )
     {
-        uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+        struct ifreq ifr;
+        struct ethtool_value edata;
 
-        network_port->link_status = new_status;
+        memset(&edata, 0, sizeof(edata));
+        memset(&ifr, 0, sizeof(ifr));
+        edata.cmd = ETHTOOL_GLINK;
+        strcpy( ifr.ifr_name,network_port->device_name);
+        ifr.ifr_data = (char *)&edata;
 
-        while( rawpkt )
+        if( ioctl( fd, SIOCETHTOOL, &ifr  )==0 )
         {
-            if( rawpkt->link_status_cb )
+            if( edata.data !=0 )
             {
-                rawpkt->link_status_cb(rawpkt,new_status);
+                new_status=1;
             }
-            rawpkt=rawpkt->next;
+        }
+        close(fd);
+        if( new_status != network_port->link_status )
+        {
+            uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+
+            network_port->link_status = new_status;
+
+            while( rawpkt )
+            {
+                if( rawpkt->link_status_cb )
+                {
+                    rawpkt->link_status_cb(rawpkt,new_status);
+                }
+                rawpkt=rawpkt->next;
+            }
         }
     }
 }

@@ -49,7 +49,7 @@ void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
     uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
-    /* TODO: poll link status */
+    /* TODO: poll link status. See NotifyIpInterfaceChange  */
 
     if( new_status != network_port->link_status )
     {

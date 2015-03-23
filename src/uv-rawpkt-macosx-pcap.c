@@ -33,30 +33,75 @@
 #include "uv-rawpkt.h"
 
 #if defined(__APPLE__) && UV_RAWPKT_ENABLE_PCAP==1
+#include "uv-rawpkt-macosx-pcap.h"
+#include <net/if.h>
 #include <net/if_dl.h>
 #include <pcap.h>
+#include <sys/sockio.h>
+#include <sys/ioctl.h>
+#include <net/if_media.h>
+#include <unistd.h>
 
 
 void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
     uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
-    /* TODO: poll link status */
-
-    if( new_status != network_port->link_status )
+    struct ifmediareq ifmr;
+    int *media_list;
+    int fd;
+    
+    fd = socket( AF_INET, SOCK_DGRAM, 0 );
+    if( fd>=0 )
     {
-        uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+        memset(&ifmr, 0, sizeof(ifmr));
+        strncpy(ifmr.ifm_name, network_port->device_name , sizeof(ifmr.ifm_name));
 
-        network_port->link_status = new_status;
-
-        while( rawpkt )
+        if (ioctl(fd, SIOCGIFMEDIA, (caddr_t)&ifmr) >= 0)
         {
-            if( rawpkt->link_status_cb )
+            if (ifmr.ifm_count > 0)
             {
-                rawpkt->link_status_cb(rawpkt,new_status);
+                media_list = (int *)malloc(ifmr.ifm_count * sizeof(int));
+                if (media_list != NULL)
+                {
+                    ifmr.ifm_ulist = media_list;
+
+                    if (ioctl(fd, SIOCGIFMEDIA, (caddr_t)&ifmr) >=0 )
+                    {
+                        if (ifmr.ifm_status & IFM_AVALID)
+                        {
+                            if (ifmr.ifm_status & IFM_ACTIVE)
+                            {
+                                new_status=1;
+                            }
+                            else
+                            {
+                                new_status=0;
+                            }
+                        }
+                    }
+                    free(media_list);
+                }
             }
-            rawpkt=rawpkt->next;
         }
+        close(fd);
+
+        if( new_status != network_port->link_status )
+        {
+            uv_rawpkt_t *rawpkt = network_port->first_rawpkt;
+
+            network_port->link_status = new_status;
+
+            while( rawpkt )
+            {
+                if( rawpkt->link_status_cb )
+                {
+                    rawpkt->link_status_cb(rawpkt,new_status);
+                }
+                rawpkt=rawpkt->next;
+            }
+        }
+        
     }
 }
 
