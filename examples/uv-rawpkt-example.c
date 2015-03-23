@@ -73,6 +73,8 @@ struct port_context_s
 {
     uv_rawpkt_t rawpkt;
     int frame_received_count;
+    int link_status_updated_count;
+    int link_status;
     struct port_context_s *next;
     struct port_context_s *prev;
 };
@@ -100,6 +102,15 @@ static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
                                      const uv_buf_t *buf );
 
 /**
+ * @brief
+ *
+ * @param rawpkt The uv_rawpkt object that had a link status event
+ * @param link_status The current link status: 1=link up, 0=link down
+ */
+static void link_status_updated( uv_rawpkt_t *rawpkt, int link_status );
+
+
+/**
  * @brief rawpkt_closed callback that is called whenever a uv_rawpkt is closed
  *
  * @param handle The pointer to the uv_rawpkt_t as a uv_handle_t
@@ -121,9 +132,11 @@ static void rawpkt_closed( uv_handle_t *handle )
     uv_rawpkt_t *rawpkt = (uv_rawpkt_t *)handle;
     port_context_t *context = (port_context_t *)rawpkt->data;
 
-    printf( "Closed : %s after receiving %d frames\n",
+    printf( "Closed : %s after receiving %d frames. link changed %d times and is currently %d\n",
             rawpkt->owner_network_port->device_name,
-            context->frame_received_count );
+            context->frame_received_count,
+            context->link_status_updated_count,
+            context->link_status );
     fflush(stdout);
     /*
      * Remove the associated port context
@@ -190,6 +203,19 @@ static void received_ethernet_frame( uv_rawpkt_t *rawpkt,
     }
     fflush(stdout);
 }
+
+
+static void link_status_updated( uv_rawpkt_t *rawpkt, int link_status )
+{
+    port_context_t *context = (port_context_t *)rawpkt->data;
+    const uint8_t *mac = rawpkt->owner_network_port->mac;
+
+    context->link_status = link_status;
+    context->link_status_updated_count++;
+    printf("\nLink status updated: %02X:%02X:%02X:%02X:%02X:%02X : %d count %d\n",
+           mac[0], mac[1], mac[2], mac[3], mac[4], mac[5], context->link_status, context->link_status_updated_count );
+}
+
 
 static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
                              uv_rawpkt_network_port_t *network_port )
@@ -258,6 +284,9 @@ static void found_interface( uv_rawpkt_network_port_iterator_t *iter,
                 uv_rawpkt_recv_start(
                             &context->rawpkt,
                             received_ethernet_frame );
+                uv_rawpkt_link_status_start(
+                            &context->rawpkt,
+                            link_status_updated );
             }
 
             if( status>=0 )
@@ -307,7 +336,7 @@ static void removed_interface( uv_rawpkt_network_port_iterator_t *iter,
 
 }
 
-void finish( uv_signal_t *handle, int sig )
+static void finish( uv_signal_t *handle, int sig )
 {
     uv_rawpkt_network_port_iterator_t *network_port_iterator =
             (uv_rawpkt_network_port_iterator_t *)handle->data;
@@ -333,14 +362,24 @@ int main()
 {
     uv_loop_t *loop = uv_default_loop();
     uv_signal_t sigint_handle;
+    uv_signal_t sigterm_handle;
     uv_rawpkt_network_port_iterator_t rawpkt_iter;
+    
     uv_rawpkt_network_port_iterator_init(loop,&rawpkt_iter);
+    
     uv_rawpkt_network_port_iterator_start(
                 &rawpkt_iter,
                 found_interface,
                 removed_interface);
+    
     uv_signal_init(loop,&sigint_handle);
     sigint_handle.data = &rawpkt_iter;
+    
+    uv_signal_init(loop,&sigterm_handle);
+    sigterm_handle.data = &rawpkt_iter;
+    
+    uv_signal_start(&sigint_handle,finish,SIGTERM);
     uv_signal_start(&sigint_handle,finish,SIGINT);
+    
     uv_run( loop, UV_RUN_DEFAULT );
 }
