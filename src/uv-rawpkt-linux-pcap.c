@@ -34,6 +34,7 @@
 
 #if defined(__linux__) && UV_RAWPKT_ENABLE_PCAP==1
 #include <sys/ioctl.h>
+#include <linux/if.h>
 #include <linux/ethtool.h>
 #include <linux/sockios.h>
 #include <linux/if_packet.h>
@@ -44,7 +45,7 @@ void uv__rawpkt_network_port_link_status_timer(uv_timer_t* handle)
 {
     int new_status=0;
     uv_rawpkt_network_port_t *network_port = (uv_rawpkt_network_port_t *)handle->data;
-
+    int fd;
     fd = socket( AF_INET, SOCK_DGRAM, 0 );
     if( fd>=0 )
     {
