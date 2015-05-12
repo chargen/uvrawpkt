@@ -232,7 +232,11 @@ int uv_rawpkt_send(uv_rawpkt_send_t* req,
     unsigned int i;
     for( i=0; i<nbufs; ++i )
     {
-        pcap_sendpacket(pcap,(const u_char *)bufs[i].base,bufs[i].len);
+        int status = pcap_sendpacket(pcap,(const u_char *)bufs[i].base,bufs[i].len);
+        if( send_cb )
+        {
+            send_cb( req, status );
+        }
     }
     return 0;
 }
